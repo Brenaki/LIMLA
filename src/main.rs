@@ -8,6 +8,7 @@ use image::DynamicImage;
 use std::env;
 use std::fs;
 use glob::glob;
+use std::path::Path;
 
 /*
 * in: path input directory with images
@@ -29,7 +30,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for entry in glob(&pattern).expect("Failed to read glob pattern") {
         match entry {
             Ok(path) => {
-                if let Err(e) = compress_images(path.to_str().unwrap()) {
+                let path_str = path.to_str().unwrap();
+                if let Err(e) = compress_images(path_str) {
                     eprintln!("Error compressing {}: {}", path.display(), e);
                 }
             },
@@ -41,12 +43,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn compress_images(input_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let path = Path::new(input_path);
+
     // open image
-    let img = image::open(input_path)?;
+    let img = image::open(path)?;
     
     // vetor with levels about compression
-    let quality_levels = vec![1, 5, 10];
+    let quality_levels = vec![1u8, 5u8, 10u8];
     
+    let file_name = path
+        .file_stem()
+        .ok_or("Invalid file name")?
+        .to_string_lossy()
+        .to_string();
+
+    let class = path
+        .parent()
+        .and_then(|p| p.file_name())
+        .ok_or("Could not get class folder")?
+        .to_string_lossy()
+        .to_string();
+
+    let split = path
+        .parent()
+        .and_then(|p| p.parent())
+        .and_then(|p| p.file_name())
+        .ok_or("Could not get split folder (train/val/test)")?
+        .to_string_lossy()
+        .to_string();
+
+
     // create diretory for compressed images
     println!("Original image: {}", input_path);
     let original_size = fs::metadata(input_path)?.len();
@@ -54,18 +80,18 @@ fn compress_images(input_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     
     // call compress_jpeg for all levels compression
     for quality in quality_levels {
-        let parts: Vec<&str> = input_path.split("/").collect();
-        
-        fs::create_dir_all(format!("compressed_images/{}/{}", parts[parts.len() - 2], quality))?;
-        let output_path = format!("compressed_images/{}/{}/{}.jpg", parts[parts.len() - 2], quality, parts[parts.len() - 1].replace(".jpeg", ""));
+        let out_dir = format!("compressed/q{}/{}/{}", quality, split, class);
+        fs::create_dir_all(&out_dir)?;
+
+        let output_path = format!("{}/{}.jpg", out_dir, file_name);
         compress_jpeg(&img, &output_path, quality)?;
         
         // differences with input file and output file
         let compressed_size = fs::metadata(&output_path)?.len();
         let compression_ratio = (compressed_size as f64 / original_size as f64) * 100.0;
         
-        println!("Quality {}%: {} bytes ({:.1}% of original)", 
-                quality, compressed_size, compression_ratio);
+        println!("Quality {}%: {} bytes ({:.1}% of original) -> {}", 
+                quality, compressed_size, compression_ratio, output_path);
     }
     
     Ok(())
