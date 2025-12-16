@@ -7,15 +7,18 @@
 use glob::glob;
 use image::DynamicImage;
 use indicatif::ProgressBar;
+use rayon::prelude::*;
 use std::env;
 use std::fs;
 use std::path::Path;
+
+const QUALITY_LEVELS: [u8; 3] = [1, 5, 10];
 
 /*
 * in: path input directory with images
 * out: diretory with images compressions "compressed_images/{name_file}_{% compression}.jpg"
 */
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 2 {
@@ -34,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .filter_map(Result::ok)
         .collect();
 
-    let total_files = paths.len() * 3;
+    let total_files = paths.len() * QUALITY_LEVELS.len();
 
     let bar = ProgressBar::new(total_files.try_into().unwrap());
 
@@ -42,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Err(e) = compress_images(path.to_str().unwrap()) {
             eprintln!("Error compressing {}: {}", path.display(), e);
         }
-        bar.inc(1);
+        bar.inc(QUALITY_LEVELS.len() as u64);
     }
 
     bar.finish();
@@ -50,14 +53,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn compress_images(input_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn compress_images(input_path: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let path = Path::new(input_path);
 
     // open image
     let img = image::open(path)?;
-
-    // vetor with levels about compression
-    let quality_levels = vec![1u8, 5u8, 10u8];
 
     let file_name = path
         .file_stem()
@@ -81,15 +81,18 @@ fn compress_images(input_path: &str) -> Result<(), Box<dyn std::error::Error>> {
         .to_string();
 
     // call compress_jpeg for all levels compression
-    for quality in quality_levels {
-        let out_dir = format!("compressed/q{}/{}/{}", quality, split, class);
-        fs::create_dir_all(&out_dir)?;
+    QUALITY_LEVELS
+        .par_iter()
+        .try_for_each(|&quality| -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+            let out_dir = format!("compressed/q{}/{}/{}", quality, split, class);
+            fs::create_dir_all(&out_dir)?;
 
-        let output_path = format!("{}/{}.jpg", out_dir, file_name);
-        compress_jpeg(&img, &output_path, quality)?;
+            let output_path = format!("{}/{}.jpg", out_dir, file_name);
+            compress_jpeg(&img, &output_path, quality)?;
 
-        // differences with input file and output file
-    }
+            // differences with input file and output file
+            Ok(())
+        })?;
 
     Ok(())
 }
@@ -98,7 +101,7 @@ fn compress_jpeg(
     img: &DynamicImage,
     output_path: &str,
     quality: u8,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use std::fs::File;
     use std::io::BufWriter;
 
@@ -124,7 +127,7 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn test_compress_jpeg() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_compress_jpeg() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // create a simple test image (100x100 pixels, red color)
         let test_image = image::RgbImage::from_fn(100, 100, |_, _| image::Rgb([255, 0, 0]));
         let dynamic_image = image::DynamicImage::ImageRgb8(test_image);
@@ -153,7 +156,8 @@ mod tests {
     }
 
     #[test]
-    fn test_compress_jpeg_different_qualities() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_compress_jpeg_different_qualities(
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // create a test image
         let test_image =
             image::RgbImage::from_fn(200, 200, |x, y| image::Rgb([x as u8, y as u8, 128]));

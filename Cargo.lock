@@ -9,6 +9,7 @@ dependencies = [
  "glob",
  "image",
  "indicatif",
+ "rayon",
 ]
 
 [[package]]
