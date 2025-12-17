@@ -7,6 +7,8 @@ name = "cnn"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "numpy" },
+    { name = "pillow" },
     { name = "torch" },
     { name = "torchvision" },
     { name = "tqdm" },
@@ -14,6 +16,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "numpy" },
+    { name = "pillow" },
     { name = "torch" },
     { name = "torchvision" },
     { name = "tqdm", specifier = ">=4.67.1" },
