@@ -45,8 +45,7 @@ Exemplos de uso:
         '--quality',
         type=int,
         default=1,
-        choices=[1, 5, 10],
-        help='Qualidade da imagem (1, 5, ou 10) - padrão: 1'
+        help='Qualidade da imagem (1-100) - padrão: 1'
     )
     
     # Treinamento
@@ -112,6 +111,9 @@ Exemplos de uso:
     args = parser.parse_args()
     
     # Validações
+    if args.quality < 1 or args.quality > 100:
+        parser.error(f"Qualidade deve estar entre 1 e 100, recebido: {args.quality}")
+    
     data_dir = Path(args.data_dir)
     if not data_dir.exists():
         parser.error(f"Diretório de dados não encontrado: {args.data_dir}")
