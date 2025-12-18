@@ -4,20 +4,93 @@
 * last-update: 17-12-2025
 */
 
+use clap::{Parser, Subcommand, Args as ClapArgs};
 use glob::glob;
 use image::DynamicImage;
 use indicatif::ProgressBar;
 use rand::seq::SliceRandom;
-use rand::rng;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::env;
 use std::fs;
+use rand::rng;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
-const QUALITY_LEVELS: [u8; 3] = [1, 5, 10];
+/// LIMLA
+#[derive(Parser, Debug)]
+#[command(version, about, long_about=None)]
+struct Args {
+    /// Path for dataset
+    #[arg(short, long)]
+    path: String,
 
-// Config split (train, val, test)
+    /// train % for split in folder (Example: 0.7)
+    #[arg(short = 'r', long, default_value_t = 0.8)]
+    train: f32,
+
+    /// val % for split in folder (Example: 0.15)
+    #[arg(short, long, default_value_t = 0.1)]
+    val: f32,
+
+    /// test % for split in folder (Example: 0.15)
+    #[arg(short, long, default_value_t = 0.1)]
+    test: f32,
+
+    /// quality levels to compress (Example: "1,5,10")
+    #[arg(short, long, default_value = "1,5,10")]
+    quality: String,
+
+    /// output directory (Example: "./compressed")
+    #[arg(short, long, default_value = "./compressed")]
+    output: String,
+
+    /// call cnn to train
+    #[command(subcommand)]
+    cnn: Option<CnnCommand>,
+}
+
+#[derive(Subcommand, Debug)]
+enum CnnCommand {
+    /// Train CNN model
+    Run(CnnRunArgs),
+}
+
+#[derive(ClapArgs, Debug)]
+struct CnnRunArgs {
+    /// model to train (Example: "MobileNetV2")
+    #[arg(short, long, default_value = "MobileNetV2")]
+    model: String,
+
+    /// epochs to train (Example: 50)
+   #[arg(short, long, default_value_t = 1)]
+    epochs: u32,
+
+    /// batch size to train (Example: 32)
+    #[arg(short, long, default_value_t = 8)]
+    batch_size: u32,
+
+    /// patience to train (Example: 3)
+    #[arg(short, long, default_value_t = 3)]
+    patience: u32,
+
+    /// output directory to train (Example: "./out")
+    #[arg(short, long, default_value = "./out")]
+    output_dir: String,
+}
+
+// parse quality levels from CLI
+fn parse_quality_levels(quality_str: &str) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+    quality_str
+        .split(',')
+        .map(|s| {
+            s.trim()
+                .parse::<u8>()
+                .map_err(|e| format!("Invalid quality level '{}': {}", s, e).into())
+        })
+        .collect()
+}
+
+// config split (train, val, test)
 struct SplitConfig {
     train: f32,
     val: f32,
@@ -34,40 +107,15 @@ impl Default for SplitConfig {
     }
 }
 
-/*
-* in: path input directory with images
-* out: diretory with images compressions "compressed/{quality}/{root}/{train/val/test}/{classes}/{name_file}_{% compression}.jpg"
-*/
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 2 || args.len() > 5 {
-        eprintln!(
-            "Usage: {} <input_directory> [train_pct] [val_pct] [test_pct]",
-            args[0]
-        );
-        eprintln!("Example: {} ./dataset 0.7 0.15 0.15", args[0]);
-        std::process::exit(1);
-    }
+    let args = Args::parse();
 
     // path for directory
-    let input_path = &args[1];
+    let input_path = &args.path;
 
     // parse split percentafes from args or use defaults
-    let split_config = if args.len() == 5 {
-        let train = args[2].parse::<f32>()?;
-        let val = args[3].parse::<f32>()?;
-        let test = args[4].parse::<f32>()?;
-
-        if (train + val + test - 1.0).abs() > 0.001 {
-            eprintln!(
-                "Error: train + val + test must equal 1.0 (got {})",
-                train + val + test
-            );
-            std::process::exit(1);
-        }
-
-        SplitConfig { train, val, test }
+    let split_config = if args.train + args.val + args.test == 1.0 {
+        SplitConfig { train: args.train, val: args.val, test: args.test }
     } else {
         SplitConfig::default()
     };
@@ -78,6 +126,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         split_config.val * 100.0,
         split_config.test * 100.0
     );
+
+    // parse quality levels from CLI
+    let quality_levels = parse_quality_levels(&args.quality)?;
+    println!("Quality levels: {:?}", quality_levels);
 
     // get all images per classes
     let images_by_class = collet_images_by_class(input_path)?;
@@ -93,19 +145,61 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     let total_images = images_by_class.values().map(|v| v.len()).sum::<usize>();
-    let total_operations = total_images * QUALITY_LEVELS.len();
+    let total_operations = total_images * quality_levels.len();
     let bar = ProgressBar::new(total_operations as u64);
 
     // process per classe
     for (class_name, images) in images_by_class {
-        split_and_compress_class(&class_name, images, &split_config, &bar)?;
+        split_and_compress_class(&class_name, images, &split_config, &quality_levels, &bar, &args.output)?;
     }
 
     bar.finish_with_message("Compression complete!");
 
+    if let Some(CnnCommand::Run(cnn_args)) = args.cnn {
+        train_cnn(&args.output, &quality_levels, &cnn_args)?;
+    }
+
     Ok(())
 }
 
+// train cnn
+fn train_cnn(output: &str, quality_levels: &[u8], cnn_args: &CnnRunArgs) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Convert output path to be relative to cnn directory
+    let data_dir = if output.starts_with('/') {
+        output.to_string()
+    } else {
+        format!("../{}", output)
+    };
+    
+    let command = format!(
+        "cd cnn && source .venv/bin/activate && python main.py --model {} --data_dir {} --quality {} --epochs {} --batch_size {} --output_dir {} --patience {}",
+        cnn_args.model,
+        data_dir,
+        quality_levels[0],
+        cnn_args.epochs,
+        cnn_args.batch_size,
+        cnn_args.output_dir,
+        cnn_args.patience
+    );
+
+    let mut child = Command::new("bash")
+        .arg("-c")
+        .arg(&command)
+        .spawn()
+        .expect("process failed to start");
+
+    let status = child.wait().expect("failed to wait for process");
+
+    if !status.success() {
+        return Err(format!("CNN training failed with exit code: {:?}", status.code()).into());
+    }
+
+    println!("CNN trained successfully");
+
+    Ok(())
+}
+
+// collect images by class
 fn collet_images_by_class(
     input_path: &str,
 ) -> Result<HashMap<String, Vec<PathBuf>>, Box<dyn std::error::Error + Send + Sync>> {
@@ -133,11 +227,14 @@ fn collet_images_by_class(
     Ok(images_by_class)
 }
 
+// split and compress class
 fn split_and_compress_class(
     class_name: &str,
     mut images: Vec<PathBuf>,
     config: &SplitConfig,
+    quality_levels: &[u8],
     bar: &ProgressBar,
+    output: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut rng = rng();
     images.as_mut_slice().shuffle(&mut rng);
@@ -150,32 +247,38 @@ fn split_and_compress_class(
     let val_imgs = &images[train_count..train_count + val_count];
     let test_imgs = &images[train_count + val_count..];
 
-    process_split(train_imgs, "train", class_name, bar)?;
-    process_split(val_imgs, "val", class_name, bar)?;
-    process_split(test_imgs, "test", class_name, bar)?;
+    process_split(train_imgs, "train", class_name, quality_levels, bar, output)?;
+    process_split(val_imgs, "val", class_name, quality_levels, bar, output)?;
+    process_split(test_imgs, "test", class_name, quality_levels, bar, output)?;
 
     Ok(())
 }
 
+// process split
 fn process_split(
     images: &[PathBuf],
     split: &str,
     class: &str,
+    quality_levels: &[u8],
     bar: &ProgressBar,
+    output: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     images.par_iter().try_for_each(|img_path| {
-        compress_image_to_split(img_path, split, class, bar)?;
+        compress_image_to_split(img_path, split, class, quality_levels, bar, output)?;
         Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     })?;
 
     Ok(())
 }
 
+// compress image to split
 fn compress_image_to_split(
     img_path: &Path,
     split: &str,
     class: &str,
+    quality_levels: &[u8],
     bar: &ProgressBar,
+    output: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let img = image::open(img_path)?;
 
@@ -185,16 +288,16 @@ fn compress_image_to_split(
         .to_string_lossy()
         .to_string();
 
-    // Each thread processes a different QUALITY_LEVEL
-    QUALITY_LEVELS.par_iter().try_for_each(
+    // Each thread processes a different quality level
+    quality_levels.par_iter().try_for_each(
         |&quality| -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-            let out_dir = format!("compressed/q{}/{}/{}", quality, split, class);
+            let out_dir = format!("{}/q{}/{}/{}", output, quality, split, class);
             fs::create_dir_all(&out_dir)?;
 
             let output_path = format!("{}/{}.jpg", out_dir, file_name);
             compress_jpeg(&img, &output_path, quality)?;
 
-            // Increment the progress bar for each QUALITY_LEVEL processed
+            // Increment the progress bar for each quality level processed
             bar.inc(1);
 
             Ok(())
@@ -204,6 +307,7 @@ fn compress_image_to_split(
     Ok(())
 }
 
+// compress jpeg
 fn compress_jpeg(
     img: &DynamicImage,
     output_path: &str,
@@ -241,7 +345,10 @@ mod tests {
 
         let result = compress_jpeg(&dynamic_image, output_path, 50);
         assert!(result.is_ok(), "Compression should succeed");
-        assert!(Path::new(output_path).exists(), "Output file should be created");
+        assert!(
+            Path::new(output_path).exists(),
+            "Output file should be created"
+        );
 
         let metadata = fs::metadata(output_path)?;
         assert!(metadata.len() > 0, "Compressed file should not be empty");
@@ -251,8 +358,8 @@ mod tests {
     }
 
     #[test]
-    fn test_compress_jpeg_different_qualities(
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    fn test_compress_jpeg_different_qualities()
+    -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let test_image =
             image::RgbImage::from_fn(200, 200, |x, y| image::Rgb([x as u8, y as u8, 128]));
         let dynamic_image = image::DynamicImage::ImageRgb8(test_image);
@@ -263,15 +370,25 @@ mod tests {
         for (i, quality) in qualities.iter().enumerate() {
             let output_path = format!("test_compressed_{}.jpg", i);
             let result = compress_jpeg(&dynamic_image, &output_path, *quality);
-            assert!(result.is_ok(), "Compression with quality {} should succeed", quality);
+            assert!(
+                result.is_ok(),
+                "Compression with quality {} should succeed",
+                quality
+            );
 
             let metadata = fs::metadata(&output_path)?;
             file_sizes.push(metadata.len());
             fs::remove_file(output_path)?;
         }
 
-        assert!(file_sizes[0] < file_sizes[1], "Quality 10 should produce smaller file than quality 50");
-        assert!(file_sizes[1] < file_sizes[2], "Quality 50 should produce smaller file than quality 90");
+        assert!(
+            file_sizes[0] < file_sizes[1],
+            "Quality 10 should produce smaller file than quality 50"
+        );
+        assert!(
+            file_sizes[1] < file_sizes[2],
+            "Quality 50 should produce smaller file than quality 90"
+        );
 
         Ok(())
     }
@@ -293,3 +410,4 @@ mod tests {
         assert_eq!(config.test, 0.1);
     }
 }
+
