@@ -4,6 +4,7 @@
 [![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org/)
 [![Python](https://img.shields.io/badge/Python-3.13+-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
+[![wakatime](https://wakatime.com/badge/user/fdb75ce3-7263-4128-b59f-498eaf060cb7/project/ff82487a-5423-4677-8f63-fa51816fa944.svg)](https://wakatime.com/badge/user/fdb75ce3-7263-4128-b59f-498eaf060cb7/project/ff82487a-5423-4677-8f63-fa51816fa944)
 
 ## 📋 About the Project
 
