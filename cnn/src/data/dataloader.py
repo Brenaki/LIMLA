@@ -7,6 +7,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms
+from pathlib import Path
 from typing import Optional, Tuple, List
 
 from .dataset import ImageClassificationDataset
@@ -163,7 +164,7 @@ def create_test_loader(
             # Assume estrutura: original_data_dir/test/{class}/
             custom_path = str(Path(original_data_dir) / 'test')
             test_dataset = ImageClassificationDataset(
-                data_dir=original_data_dir,  # Base dir
+                data_dir=str(Path(original_data_dir).parent),  # Base dir (compressed/)
                 quality=100,  # Dummy, não usado
                 split='test',
                 classes=classes,
@@ -171,21 +172,21 @@ def create_test_loader(
                 custom_split_path=custom_path
             )
         else:
-            # Tenta encontrar em compressed/original/test/ ou data_dir/original/test/
-            possible_paths = [
-                Path(data_dir).parent / 'original' / 'test',
-                Path(data_dir) / 'original' / 'test'
-            ]
+            # Tenta encontrar pasta original em data_dir (qualquer pasta que não seja q*)
+            data_dir_path = Path(data_dir)
+            original_dir = None
             
-            custom_path = None
-            for path in possible_paths:
-                if path.exists():
-                    custom_path = str(path)
-                    break
+            for item in data_dir_path.iterdir():
+                if item.is_dir() and not item.name.startswith('q'):
+                    test_dir = item / 'test'
+                    if test_dir.exists():
+                        original_dir = item
+                        break
             
-            if custom_path:
+            if original_dir:
+                custom_path = str(original_dir / 'test')
                 test_dataset = ImageClassificationDataset(
-                    data_dir=str(Path(custom_path).parent.parent),  # Base dir
+                    data_dir=str(data_dir_path),  # Base dir (compressed/)
                     quality=100,  # Dummy
                     split='test',
                     classes=classes,
@@ -193,16 +194,38 @@ def create_test_loader(
                     custom_split_path=custom_path
                 )
             else:
-                # Fallback: usa qualidade máxima disponível como proxy
-                print(f"AVISO: Diretório original não encontrado. Tentando caminhos: {possible_paths}")
-                print("Usando qualidade 100 como proxy para original")
-                test_dataset = ImageClassificationDataset(
-                    data_dir=data_dir,
-                    quality=100,
-                    split='test',
-                    classes=classes,
-                    transform=get_transforms(is_training=False)
-                )
+                # Fallback: tenta caminhos comuns
+                possible_paths = [
+                    Path(data_dir).parent / 'original' / 'test',
+                    Path(data_dir) / 'original' / 'test'
+                ]
+                
+                custom_path = None
+                for path in possible_paths:
+                    if path.exists():
+                        custom_path = str(path)
+                        break
+                
+                if custom_path:
+                    test_dataset = ImageClassificationDataset(
+                        data_dir=str(Path(custom_path).parent.parent),  # Base dir
+                        quality=100,  # Dummy
+                        split='test',
+                        classes=classes,
+                        transform=get_transforms(is_training=False),
+                        custom_split_path=custom_path
+                    )
+                else:
+                    # Fallback: usa qualidade máxima disponível como proxy
+                    print(f"AVISO: Diretório original não encontrado. Tentando caminhos: {possible_paths}")
+                    print("Usando qualidade 100 como proxy para original")
+                    test_dataset = ImageClassificationDataset(
+                        data_dir=data_dir,
+                        quality=100,
+                        split='test',
+                        classes=classes,
+                        transform=get_transforms(is_training=False)
+                    )
     else:
         # Qualidade numérica
         quality_int = int(test_quality)

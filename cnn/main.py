@@ -110,7 +110,12 @@ def main():
     
     # Configura early stopping
     output_dir = Path(args.output_dir)
-    model_output_dir = output_dir / args.model
+    # Inclui seed no nome do diretório do modelo se fornecido
+    if args.seed is not None:
+        model_dir_name = f"{args.model}_seed{args.seed}"
+    else:
+        model_dir_name = args.model
+    model_output_dir = output_dir / model_dir_name
     best_model_path = model_output_dir / 'best.pt'
     
     early_stopping = EarlyStopping(
@@ -147,7 +152,7 @@ def main():
         loss=history['val_loss'][best_epoch_idx],
         accuracy=history['val_accuracy'][best_epoch_idx],
         output_dir=str(output_dir),
-        model_name=args.model,
+        model_name=model_dir_name,
         is_best=True
     )
     
@@ -160,7 +165,7 @@ def main():
         loss=history['val_loss'][last_epoch],
         accuracy=history['val_accuracy'][last_epoch],
         output_dir=str(output_dir),
-        model_name=args.model,
+        model_name=model_dir_name,
         is_best=False
     )
     
@@ -168,7 +173,7 @@ def main():
     save_classes_mapping(
         classes=classes,
         output_dir=str(output_dir),
-        model_name=args.model
+        model_name=model_dir_name
     )
     
     print(f"Modelos salvos em: {model_output_dir}")
@@ -208,11 +213,42 @@ def main():
         print("AVISO: Melhor modelo não encontrado, usando modelo atual")
         best_epoch = best_epoch_idx + 1
     
-    # Lista de qualidades para testar
-    test_qualities = ['original', str(args.quality)]  # Por padrão: original + mesma qualidade do treino
+    # Detecta automaticamente todas as qualidades disponíveis para teste
+    data_dir_path = Path(args.data_dir)
+    test_qualities = []
     
-    # Se argumento --test_qualities fornecido, usa ele (será implementado depois)
-    # Por enquanto, avalia apenas em original e mesma qualidade
+    # Detecta qualidades numéricas (q1, q5, q10, etc)
+    available_qualities = []
+    for item in data_dir_path.iterdir():
+        if item.is_dir() and item.name.startswith('q') and item.name[1:].isdigit():
+            quality_num = int(item.name[1:])
+            # Verifica se tem pasta test
+            test_dir = item / 'test'
+            if test_dir.exists():
+                available_qualities.append(quality_num)
+    
+    # Ordena as qualidades
+    available_qualities.sort()
+    
+    # Adiciona todas as qualidades disponíveis
+    for q in available_qualities:
+        test_qualities.append(str(q))
+    
+    # Detecta pasta original (qualquer pasta que não seja q* e tenha test/)
+    original_dir = None
+    for item in data_dir_path.iterdir():
+        if item.is_dir() and not item.name.startswith('q'):
+            test_dir = item / 'test'
+            if test_dir.exists():
+                original_dir = item
+                break
+    
+    # Se encontrou pasta original, adiciona 'original' à lista
+    if original_dir:
+        test_qualities.append('original')
+        print(f"Pasta original detectada: {original_dir.name}")
+    
+    print(f"Qualidades disponíveis para teste: {test_qualities}")
     
     criterion = nn.CrossEntropyLoss()
     
@@ -220,13 +256,19 @@ def main():
         print(f"\nAvaliando com test_quality = {test_q}...")
         try:
             # Cria test loader
+            # Se for 'original', passa o diretório original detectado
+            original_data_dir = None
+            if test_q == 'original' and original_dir:
+                original_data_dir = str(original_dir)
+            
             test_loader, test_classes = create_test_loader(
                 data_dir=args.data_dir,
                 test_quality=test_q,
                 batch_size=args.batch_size,
                 num_workers=args.num_workers,
                 classes=classes,  # Usa classes do treino
-                seed=args.seed
+                seed=args.seed,
+                original_data_dir=original_data_dir
             )
             
             n_test = len(test_loader.dataset)
