@@ -162,9 +162,9 @@ def run_training(
         )
         
         # Lê e exibe saída em tempo real
-        # Filtra atualizações do tqdm para evitar spam de linhas
+        # Filtra completamente atualizações do tqdm para evitar spam
         tqdm_pattern = re.compile(r'.*\|\s*\d+%\|.*\[.*\].*it/s.*')
-        last_tqdm_line = None
+        tqdm_keywords = ['it/s', 'Treinamento:', 'Validação:', 'Teste:']
         tqdm_update_count = 0
         
         for line in process.stdout:
@@ -176,25 +176,20 @@ def run_training(
             ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
             clean_line = ansi_escape.sub('', line)
             
-            # Detecta se é uma linha do tqdm
-            is_tqdm = bool(tqdm_pattern.match(clean_line)) or ('it/s' in clean_line and '|' in clean_line and '%' in clean_line)
+            # Detecta se é uma linha do tqdm (mais abrangente)
+            is_tqdm = (
+                bool(tqdm_pattern.match(clean_line)) or
+                ('it/s' in clean_line and ('|' in clean_line or '%' in clean_line)) or
+                (any(kw in clean_line for kw in tqdm_keywords) and ('%' in clean_line or 'it/s' in clean_line))
+            )
             
             if is_tqdm:
+                # Não mostra tqdm no console, apenas salva ocasionalmente no log
                 tqdm_update_count += 1
-                last_tqdm_line = clean_line
-                # Mostra apenas a cada 10 atualizações do tqdm para reduzir spam
-                if tqdm_update_count % 10 == 0:
-                    print(f'\r{clean_line}', end='', flush=True)
-                # Salva no log apenas ocasionalmente para não encher o arquivo
-                if logger and tqdm_update_count % 50 == 0:  # Salva ~2% das atualizações
+                if logger and tqdm_update_count % 100 == 0:  # Salva ~1% das atualizações
                     logger.info(clean_line)
             else:
-                # Para linhas normais, imprime em nova linha
-                if last_tqdm_line is not None:
-                    # Limpa a linha do tqdm antes de imprimir nova linha
-                    print('\r' + ' ' * len(last_tqdm_line) + '\r', end='', flush=True)
-                    last_tqdm_line = None
-                    tqdm_update_count = 0
+                # Para linhas normais, imprime normalmente
                 print(clean_line, flush=True)
                 if logger:
                     logger.info(clean_line)
