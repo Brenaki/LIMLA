@@ -139,6 +139,14 @@ def run_training(
     ]
     
     try:
+        # Remove console_handler do logger para evitar duplicação de saída
+        # já que vamos exibir manualmente
+        if logger:
+            # Remove todos os console handlers
+            for handler in logger.handlers[:]:
+                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                    logger.removeHandler(handler)
+        
         # Executa processo e exibe saída em tempo real
         # Usa Popen para ler linha por linha e exibir imediatamente
         process = subprocess.Popen(
@@ -152,13 +160,12 @@ def run_training(
         )
         
         # Lê e exibe saída em tempo real
-        output_lines = []
         for line in process.stdout:
             line = line.rstrip()
             if line:
-                print(line, flush=True)  # Exibe imediatamente
-                output_lines.append(line)
+                print(line, flush=True)  # Exibe imediatamente no console
                 if logger:
+                    # Salva no arquivo de log sem exibir no console novamente
                     logger.info(line)
         
         # Espera processo terminar
