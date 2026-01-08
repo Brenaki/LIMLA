@@ -5,7 +5,7 @@ Lógica de treinamento e validação de modelos.
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from typing import Dict, List
+from typing import Dict, List, Optional
 from tqdm import tqdm
 
 
