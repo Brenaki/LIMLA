@@ -12,7 +12,7 @@ from src.presentation.cli import parse_args
 from src.presentation.progress import print_config, print_training_summary
 from src.data.dataloader import create_dataloaders
 from src.infrastructure.model_builder import build_model
-from src.infrastructure.checkpoint import save_checkpoint, save_classes_mapping
+from src.infrastructure.checkpoint import save_checkpoint, save_classes_mapping, save_results_to_csv
 from src.use_cases.train import train_model
 from src.use_cases.early_stopping import EarlyStopping
 
@@ -133,6 +133,14 @@ def main():
     )
     
     print(f"Modelos salvos em: {model_output_dir}")
+    
+    # Salva resultados no CSV consolidado
+    save_results_to_csv(
+        model_name=args.model,
+        quality=args.quality,
+        history=history,
+        output_dir=str(output_dir)
+    )
     
     # Exibe resumo
     print_training_summary(history)
