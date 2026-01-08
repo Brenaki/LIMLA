@@ -139,24 +139,44 @@ def run_training(
     ]
     
     try:
-        result = subprocess.run(
+        # Executa processo e exibe saída em tempo real
+        # Usa Popen para ler linha por linha e exibir imediatamente
+        process = subprocess.Popen(
             cmd,
             cwd=Path(__file__).parent.parent,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            check=True
+            bufsize=1,  # Line buffered
+            universal_newlines=True
         )
         
-        if logger:
-            logger.info("STDOUT:\n" + result.stdout)
-            if result.stderr:
-                logger.warning("STDERR:\n" + result.stderr)
+        # Lê e exibe saída em tempo real
+        output_lines = []
+        for line in process.stdout:
+            line = line.rstrip()
+            if line:
+                print(line, flush=True)  # Exibe imediatamente
+                output_lines.append(line)
+                if logger:
+                    logger.info(line)
+        
+        # Espera processo terminar
+        return_code = process.wait()
+        
+        if return_code != 0:
+            error_msg = f"ERRO no treinamento: código de saída {return_code}"
+            if logger:
+                logger.error(error_msg)
+            else:
+                print(error_msg)
+            return False
         
         log(f"Treinamento concluído com sucesso")
         return True
         
-    except subprocess.CalledProcessError as e:
-        error_msg = f"ERRO no treinamento: {e}\nSTDOUT: {e.stdout}\nSTDERR: {e.stderr}"
+    except Exception as e:
+        error_msg = f"ERRO ao executar treinamento: {e}"
         if logger:
             logger.error(error_msg)
         else:
