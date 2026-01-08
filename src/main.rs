@@ -205,12 +205,20 @@ fn collet_images_by_class(
 ) -> Result<HashMap<String, Vec<PathBuf>>, Box<dyn std::error::Error + Send + Sync>> {
     let mut images_by_class: HashMap<String, Vec<PathBuf>> = HashMap::new();
 
-    // search all images JPEG
-    let pattern = format!("{}/**/*.jpeg", input_path);
-    let paths: Vec<_> = glob(&pattern)
-        .expect("Failed to read glob pattern")
-        .filter_map(Result::ok)
-        .collect();
+    // search all images JPEG (both .jpg and .jpeg)
+    let patterns = vec![
+        format!("{}/**/*.jpg", input_path),
+        format!("{}/**/*.jpeg", input_path),
+    ];
+
+    let mut paths = Vec::new();
+    for pattern in patterns {
+        let found: Vec<_> = glob(&pattern)
+            .expect("Failed to read glob pattern")
+            .filter_map(Result::ok)
+            .collect();
+        paths.extend(found);
+    }
 
     for path in paths {
         if let Some(parent) = path.parent() {
