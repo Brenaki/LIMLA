@@ -16,7 +16,7 @@ def build_model(model_name: str, num_classes: int, pretrained: bool = True) -> n
     Constrói um modelo de classificação usando transfer learning.
     
     Args:
-        model_name: Nome do modelo (MobileNetV2 ou VGG16)
+        model_name: Nome do modelo (MobileNetV2, VGG16 ou VGG19)
         num_classes: Número de classes para classificação
         pretrained: Se True, usa pesos pré-treinados no ImageNet
         
@@ -29,10 +29,12 @@ def build_model(model_name: str, num_classes: int, pretrained: bool = True) -> n
         return _build_mobilenetv2(num_classes, pretrained)
     elif model_name_upper == ModelType.VGG16.value.upper():
         return _build_vgg16(num_classes, pretrained)
+    elif model_name_upper == ModelType.VGG19.value.upper():
+        return _build_vgg19(num_classes, pretrained)
     else:
         raise ValueError(
             f"Modelo '{model_name}' não suportado. "
-            f"Modelos disponíveis: {ModelType.MOBILENETV2.value}, {ModelType.VGG16.value}"
+            f"Modelos disponíveis: {ModelType.MOBILENETV2.value}, {ModelType.VGG16.value}, {ModelType.VGG19.value}"
         )
 
 
@@ -90,6 +92,39 @@ def _build_vgg16(num_classes: int, pretrained: bool = True) -> nn.Module:
     
     # Substitui o classificador
     # VGG16 tem um classificador com 25088 features de entrada (após flatten)
+    model.classifier = nn.Sequential(
+        nn.Linear(25088, 512),
+        nn.ReLU(),
+        nn.Dropout(0.5),
+        nn.Linear(512, 256),
+        nn.ReLU(),
+        nn.Dropout(0.5),
+        nn.Linear(256, num_classes)
+    )
+    
+    return model
+
+
+def _build_vgg19(num_classes: int, pretrained: bool = True) -> nn.Module:
+    """
+    Constrói VGG19 para classificação.
+    
+    Args:
+        num_classes: Número de classes
+        pretrained: Se True, usa pesos pré-treinados
+        
+    Returns:
+        Modelo VGG19 configurado
+    """
+    # Carrega modelo pré-treinado
+    model = models.vgg19(weights='IMAGENET1K_V1' if pretrained else None)
+    
+    # Congela todas as camadas de features (convolutional layers)
+    for param in model.features.parameters():
+        param.requires_grad = False
+    
+    # Substitui o classificador
+    # VGG19 tem um classificador com 25088 features de entrada (após flatten)
     model.classifier = nn.Sequential(
         nn.Linear(25088, 512),
         nn.ReLU(),

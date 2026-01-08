@@ -108,6 +108,20 @@ Exemplos de uso:
         help='Número de workers para carregamento de dados (padrão: 4)'
     )
     
+    # Seeds e reprodutibilidade
+    parser.add_argument(
+        '--seed',
+        type=int,
+        default=None,
+        help='Seed para reprodutibilidade (opcional, padrão: None)'
+    )
+    
+    parser.add_argument(
+        '--deterministic',
+        action='store_true',
+        help='Habilita modo determinístico (mais lento, mas totalmente reprodutível)'
+    )
+    
     args = parser.parse_args()
     
     # Validações

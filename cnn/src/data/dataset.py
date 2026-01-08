@@ -25,25 +25,31 @@ class ImageClassificationDataset(Dataset):
         quality: int,
         split: str,
         classes: Optional[List[str]] = None,
-        transform: Optional[callable] = None
+        transform: Optional[callable] = None,
+        custom_split_path: Optional[str] = None
     ):
         """
         Inicializa o dataset.
         
         Args:
             data_dir: Diretório base dos dados (ex: ./compressed)
-            quality: Qualidade da imagem (1, 5, ou 10)
+            quality: Qualidade da imagem (1, 5, ou 10) - usado apenas para compatibilidade
             split: Split a carregar (train, val, test)
             classes: Lista de classes. Se None, detecta automaticamente
             transform: Transformações a aplicar nas imagens
+            custom_split_path: Caminho customizado para o split (sobrescreve construção padrão)
         """
         self.data_dir = Path(data_dir)
         self.quality = quality
         self.split = split
         self.transform = transform
         
-        # Constrói caminho: {data_dir}/q{quality}/{split}/
-        quality_dir = self.data_dir / f"q{quality}" / split
+        # Se custom_split_path fornecido, usa ele; senão constrói caminho padrão
+        if custom_split_path:
+            quality_dir = Path(custom_split_path)
+        else:
+            # Constrói caminho: {data_dir}/q{quality}/{split}/
+            quality_dir = self.data_dir / f"q{quality}" / split
         
         if not quality_dir.exists():
             raise ValueError(

@@ -9,7 +9,8 @@ class ModelType(str, Enum):
     """Enum com os tipos de modelos disponíveis."""
     MOBILENETV2 = "MobileNetV2"
     VGG16 = "VGG16"
+    VGG19 = "VGG19"
 
 
 # Lista de modelos suportados
-SUPPORTED_MODELS = [ModelType.MOBILENETV2.value, ModelType.VGG16.value]
+SUPPORTED_MODELS = [ModelType.MOBILENETV2.value, ModelType.VGG16.value, ModelType.VGG19.value]

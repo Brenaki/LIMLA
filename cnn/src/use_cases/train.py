@@ -133,6 +133,65 @@ def validate_epoch(
     }
 
 
+def evaluate_test(
+    model: nn.Module,
+    dataloader: DataLoader,
+    criterion: nn.Module,
+    device: torch.device
+) -> Dict[str, float]:
+    """
+    Executa avaliação no conjunto de teste.
+    
+    Args:
+        model: Modelo a ser avaliado
+        dataloader: DataLoader com dados de teste
+        criterion: Função de perda
+        device: Dispositivo (CPU ou GPU)
+        
+    Returns:
+        Dicionário com métricas do teste (loss, accuracy)
+    """
+    model.eval()
+    running_loss = 0.0
+    correct = 0
+    total = 0
+    
+    # Barra de progresso
+    pbar = tqdm(dataloader, desc="Teste", leave=False)
+    
+    with torch.no_grad():
+        for images, labels in pbar:
+            # Move dados para dispositivo
+            images = images.to(device)
+            labels = labels.to(device)
+            
+            # Forward pass
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            
+            # Calcula métricas
+            running_loss += loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+            
+            # Atualiza barra de progresso
+            current_loss = running_loss / len(dataloader)
+            current_acc = 100 * correct / total
+            pbar.set_postfix({
+                'loss': f'{current_loss:.4f}',
+                'acc': f'{current_acc:.2f}%'
+            })
+    
+    epoch_loss = running_loss / len(dataloader)
+    epoch_accuracy = 100 * correct / total
+    
+    return {
+        'loss': epoch_loss,
+        'accuracy': epoch_accuracy
+    }
+
+
 def train_model(
     model: nn.Module,
     train_loader: DataLoader,

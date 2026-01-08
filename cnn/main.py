@@ -3,6 +3,8 @@ Ponto de entrada principal para treinamento de modelos CNN.
 Orquestra todas as camadas seguindo Clean Architecture.
 """
 
+import random
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -10,11 +12,39 @@ from pathlib import Path
 
 from src.presentation.cli import parse_args
 from src.presentation.progress import print_config, print_training_summary
-from src.data.dataloader import create_dataloaders
+from src.data.dataloader import create_dataloaders, create_test_loader
 from src.infrastructure.model_builder import build_model
-from src.infrastructure.checkpoint import save_checkpoint, save_classes_mapping, save_results_to_csv
-from src.use_cases.train import train_model
+from src.infrastructure.checkpoint import (
+    save_checkpoint, save_classes_mapping, save_results_to_csv,
+    save_test_results_to_csv, load_checkpoint
+)
+from src.use_cases.train import train_model, evaluate_test
 from src.use_cases.early_stopping import EarlyStopping
+
+
+def set_seed(seed: int, deterministic: bool = False) -> None:
+    """
+    Configura seeds para reprodutibilidade.
+    
+    Args:
+        seed: Valor do seed
+        deterministic: Se True, habilita modo totalmente determinístico (mais lento)
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    
+    if deterministic:
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        # Cuidado: use_deterministic_algorithms pode quebrar algumas operações
+        try:
+            torch.use_deterministic_algorithms(True)
+        except Exception as e:
+            print(f"AVISO: Não foi possível habilitar algoritmos determinísticos: {e}")
 
 
 def main():
@@ -22,11 +52,17 @@ def main():
     # Parse argumentos
     args = parse_args()
     
+    # Configura seed se fornecido
+    if args.seed is not None:
+        set_seed(args.seed, args.deterministic)
+        print(f"Seed configurado: {args.seed} (determinístico: {args.deterministic})")
+    
     # Exibe configuração
     print_config(args)
     
     # Configura dispositivo
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device_str = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Usando dispositivo: {device}\n")
     
     # Cria DataLoaders
@@ -35,13 +71,16 @@ def main():
         data_dir=args.data_dir,
         quality=args.quality,
         batch_size=args.batch_size,
-        num_workers=args.num_workers
+        num_workers=args.num_workers,
+        seed=args.seed
     )
     
     num_classes = len(classes)
+    n_train = len(train_loader.dataset)
+    n_val = len(val_loader.dataset)
     print(f"Classes detectadas ({num_classes}): {', '.join(classes)}")
-    print(f"Imagens de treinamento: {len(train_loader.dataset)}")
-    print(f"Imagens de validação: {len(val_loader.dataset)}\n")
+    print(f"Imagens de treinamento: {n_train}")
+    print(f"Imagens de validação: {n_val}\n")
     
     # Valida número de classes se fornecido
     if args.num_classes and args.num_classes != num_classes:
@@ -134,18 +173,98 @@ def main():
     
     print(f"Modelos salvos em: {model_output_dir}")
     
-    # Salva resultados no CSV consolidado
+    # Salva resultados no CSV consolidado (formato longo)
     save_results_to_csv(
         model_name=args.model,
-        quality=args.quality,
+        train_quality=args.quality,
+        test_quality=str(args.quality),  # Por padrão, test_quality = train_quality
+        seed=args.seed,
         history=history,
-        output_dir=str(output_dir)
+        output_dir=str(output_dir),
+        split='train',  # Será sobrescrito internamente para train/val
+        n_train=n_train,
+        n_val=n_val,
+        n_test=None,  # Será preenchido quando avaliar test split
+        device=device_str
     )
     
     # Exibe resumo
     print_training_summary(history)
     
-    print("Treinamento concluído!")
+    # Avalia no test split com múltiplas qualidades
+    print("\n" + "="*60)
+    print("AVALIAÇÃO NO TEST SPLIT")
+    print("="*60)
+    
+    # Carrega melhor modelo
+    best_model_path = model_output_dir / 'best.pt'
+    if best_model_path.exists():
+        print(f"\nCarregando melhor modelo de: {best_model_path}")
+        checkpoint = load_checkpoint(str(best_model_path), model, optimizer=None)
+        best_epoch = checkpoint.get('epoch', best_epoch_idx) + 1
+        # Garante que modelo está no device correto
+        model = model.to(device)
+    else:
+        print("AVISO: Melhor modelo não encontrado, usando modelo atual")
+        best_epoch = best_epoch_idx + 1
+    
+    # Lista de qualidades para testar
+    test_qualities = ['original', str(args.quality)]  # Por padrão: original + mesma qualidade do treino
+    
+    # Se argumento --test_qualities fornecido, usa ele (será implementado depois)
+    # Por enquanto, avalia apenas em original e mesma qualidade
+    
+    criterion = nn.CrossEntropyLoss()
+    
+    for test_q in test_qualities:
+        print(f"\nAvaliando com test_quality = {test_q}...")
+        try:
+            # Cria test loader
+            test_loader, test_classes = create_test_loader(
+                data_dir=args.data_dir,
+                test_quality=test_q,
+                batch_size=args.batch_size,
+                num_workers=args.num_workers,
+                classes=classes,  # Usa classes do treino
+                seed=args.seed
+            )
+            
+            n_test = len(test_loader.dataset)
+            print(f"Imagens de teste: {n_test}")
+            
+            # Avalia
+            test_metrics = evaluate_test(
+                model=model,
+                dataloader=test_loader,
+                criterion=criterion,
+                device=device
+            )
+            
+            print(f"  Test ({test_q}) - Loss: {test_metrics['loss']:.4f}, "
+                  f"Accuracy: {test_metrics['accuracy']:.2f}%")
+            
+            # Salva resultados no CSV
+            save_test_results_to_csv(
+                model_name=args.model,
+                train_quality=args.quality,
+                test_quality=test_q,
+                seed=args.seed,
+                test_metrics=test_metrics,
+                output_dir=str(output_dir),
+                best_epoch=best_epoch,
+                n_train=n_train,
+                n_val=n_val,
+                n_test=n_test,
+                device=device_str
+            )
+            
+        except Exception as e:
+            print(f"ERRO ao avaliar com test_quality={test_q}: {e}")
+            print("Continuando com próxima qualidade...")
+            continue
+    
+    print("\n" + "="*60)
+    print("Treinamento e avaliação concluídos!")
 
 
 if __name__ == '__main__':
