@@ -122,6 +122,21 @@ Exemplos de uso:
         help='Habilita modo determinístico (mais lento, mas totalmente reprodutível)'
     )
     
+    # Resume/Checkpoint
+    parser.add_argument(
+        '--resume',
+        type=str,
+        default=None,
+        help='Caminho do checkpoint para continuar treinamento (ex: out/MobileNetV2_seed42/last.pt). Se não especificado, tenta detectar automaticamente.'
+    )
+    
+    parser.add_argument(
+        '--checkpoint_interval',
+        type=int,
+        default=5,
+        help='Intervalo em épocas para salvar checkpoints intermediários (padrão: 5)'
+    )
+    
     args = parser.parse_args()
     
     # Validações

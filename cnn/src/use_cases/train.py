@@ -200,7 +200,10 @@ def train_model(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     epochs: int,
-    early_stopping = None
+    early_stopping = None,
+    start_epoch: int = 0,
+    history: Optional[Dict[str, List[float]]] = None,
+    checkpoint_callback = None
 ) -> Dict[str, List[float]]:
     """
     Loop principal de treinamento.
@@ -214,21 +217,29 @@ def train_model(
         device: Dispositivo (CPU ou GPU)
         epochs: Número máximo de épocas
         early_stopping: Instância de EarlyStopping (opcional)
+        start_epoch: Época inicial (para resume, padrão: 0)
+        history: Histórico anterior (para resume, padrão: None)
+        checkpoint_callback: Função callback para salvar checkpoint (epoch, model, optimizer, history) -> None
         
     Returns:
         Dicionário com histórico de treinamento
     """
-    history = {
-        'train_loss': [],
-        'train_accuracy': [],
-        'val_loss': [],
-        'val_accuracy': []
-    }
+    # Inicializa histórico
+    if history is None:
+        history = {
+            'train_loss': [],
+            'train_accuracy': [],
+            'val_loss': [],
+            'val_accuracy': []
+        }
     
-    print(f"\nIniciando treinamento por {epochs} épocas...")
+    if start_epoch > 0:
+        print(f"\nContinuando treinamento da época {start_epoch + 1}/{epochs}...")
+    else:
+        print(f"\nIniciando treinamento por {epochs} épocas...")
     print(f"Dispositivo: {device}\n")
     
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, epochs):
         print(f"Época {epoch + 1}/{epochs}")
         
         # Treinamento
@@ -262,6 +273,10 @@ def train_model(
                 print("\nTreinamento interrompido por early stopping.")
                 early_stopping.restore_best_model(model)
                 break
+        
+        # Salva checkpoint periódico se callback fornecido
+        if checkpoint_callback:
+            checkpoint_callback(epoch, model, optimizer, history)
         
         print()
     

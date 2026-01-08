@@ -117,6 +117,37 @@ def main():
         model_dir_name = args.model
     model_output_dir = output_dir / model_dir_name
     best_model_path = model_output_dir / 'best.pt'
+    last_checkpoint_path = model_output_dir / 'last.pt'
+    
+    # Verifica se deve continuar de um checkpoint
+    start_epoch = 0
+    history = None
+    resume_from = None
+    
+    if args.resume:
+        # Resume do checkpoint especificado
+        resume_from = Path(args.resume)
+        if not resume_from.exists():
+            print(f"ERRO: Checkpoint não encontrado: {resume_from}")
+            return
+    elif last_checkpoint_path.exists():
+        # Detecta automaticamente checkpoint existente
+        resume_from = last_checkpoint_path
+        print(f"Checkpoint encontrado: {resume_from}")
+        print("Continuando treinamento do checkpoint...")
+    
+    # Carrega checkpoint se encontrado
+    if resume_from:
+        print(f"Carregando checkpoint de: {resume_from}")
+        checkpoint = load_checkpoint(str(resume_from), model, optimizer)
+        start_epoch = checkpoint.get('epoch', 0) + 1  # Próxima época a treinar
+        history = checkpoint.get('history', None)
+        # Garante que modelo está no device correto
+        model = model.to(device)
+        print(f"Checkpoint carregado: época {checkpoint.get('epoch', 0) + 1}, "
+              f"loss={checkpoint.get('loss', 0):.4f}, "
+              f"accuracy={checkpoint.get('accuracy', 0):.2f}%")
+        print(f"Continuando da época {start_epoch + 1}/{args.epochs}")
     
     early_stopping = EarlyStopping(
         patience=args.patience,
@@ -125,6 +156,25 @@ def main():
         verbose=True,
         save_path=str(best_model_path)
     )
+    
+    # Callback para salvar checkpoint periódico
+    def save_periodic_checkpoint(epoch, model, optimizer, history):
+        """Salva checkpoint a cada N épocas."""
+        if (epoch + 1) % args.checkpoint_interval == 0:
+            val_loss = history['val_loss'][-1] if history['val_loss'] else 0.0
+            val_acc = history['val_accuracy'][-1] if history['val_accuracy'] else 0.0
+            save_checkpoint(
+                model=model,
+                optimizer=optimizer,
+                epoch=epoch,
+                loss=val_loss,
+                accuracy=val_acc,
+                output_dir=str(output_dir),
+                model_name=model_dir_name,
+                is_best=False,
+                history=history
+            )
+            print(f"  Checkpoint salvo (época {epoch + 1})")
     
     # Treina modelo
     history = train_model(
@@ -135,39 +185,47 @@ def main():
         optimizer=optimizer,
         device=device,
         epochs=args.epochs,
-        early_stopping=early_stopping
+        early_stopping=early_stopping,
+        start_epoch=start_epoch,
+        history=history,
+        checkpoint_callback=save_periodic_checkpoint
     )
     
     # Salva melhor modelo e último checkpoint
     print("Salvando modelos...")
-    best_epoch_idx = min(
-        range(len(history['val_loss'])),
-        key=lambda i: history['val_loss'][i]
-    )
-    
-    save_checkpoint(
-        model=model,
-        optimizer=optimizer,
-        epoch=best_epoch_idx,
-        loss=history['val_loss'][best_epoch_idx],
-        accuracy=history['val_accuracy'][best_epoch_idx],
-        output_dir=str(output_dir),
-        model_name=model_dir_name,
-        is_best=True
-    )
-    
-    # Salva último checkpoint
-    last_epoch = len(history['train_loss']) - 1
-    save_checkpoint(
-        model=model,
-        optimizer=optimizer,
-        epoch=last_epoch,
-        loss=history['val_loss'][last_epoch],
-        accuracy=history['val_accuracy'][last_epoch],
-        output_dir=str(output_dir),
-        model_name=model_dir_name,
-        is_best=False
-    )
+    if len(history['val_loss']) > 0:
+        best_epoch_idx = min(
+            range(len(history['val_loss'])),
+            key=lambda i: history['val_loss'][i]
+        )
+        
+        save_checkpoint(
+            model=model,
+            optimizer=optimizer,
+            epoch=best_epoch_idx,
+            loss=history['val_loss'][best_epoch_idx],
+            accuracy=history['val_accuracy'][best_epoch_idx],
+            output_dir=str(output_dir),
+            model_name=model_dir_name,
+            is_best=True,
+            history=history
+        )
+        
+        # Salva último checkpoint
+        last_epoch = len(history['train_loss']) - 1
+        save_checkpoint(
+            model=model,
+            optimizer=optimizer,
+            epoch=last_epoch,
+            loss=history['val_loss'][last_epoch],
+            accuracy=history['val_accuracy'][last_epoch],
+            output_dir=str(output_dir),
+            model_name=model_dir_name,
+            is_best=False,
+            history=history
+        )
+    else:
+        print("AVISO: Nenhum histórico disponível para salvar.")
     
     # Salva mapeamento de classes
     save_classes_mapping(

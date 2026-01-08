@@ -104,6 +104,7 @@ def run_training(
     epochs: int = 50,
     batch_size: int = 32,
     patience: int = 5,
+    checkpoint_interval: int = 5,
     logger: Optional[logging.Logger] = None
 ) -> bool:
     """
@@ -118,6 +119,7 @@ def run_training(
         epochs: Número de épocas
         batch_size: Tamanho do batch
         patience: Paciência para early stopping
+        checkpoint_interval: Intervalo em épocas para salvar checkpoints
         logger: Logger (opcional)
         
     Returns:
@@ -137,6 +139,7 @@ def run_training(
         '--epochs', str(epochs),
         '--batch_size', str(batch_size),
         '--patience', str(patience),
+        '--checkpoint_interval', str(checkpoint_interval),
         '--output_dir', output_dir
     ]
     
@@ -276,6 +279,12 @@ def main():
         help='Paciência para early stopping'
     )
     parser.add_argument(
+        '--checkpoint_interval',
+        type=int,
+        default=5,
+        help='Intervalo em épocas para salvar checkpoints intermediários (padrão: 5)'
+    )
+    parser.add_argument(
         '--skip_existing',
         action='store_true',
         help='Pula experimentos que já existem no CSV'
@@ -331,6 +340,7 @@ def main():
                     epochs=args.epochs,
                     batch_size=args.batch_size,
                     patience=args.patience,
+                    checkpoint_interval=args.checkpoint_interval,
                     logger=logger
                 )
                 

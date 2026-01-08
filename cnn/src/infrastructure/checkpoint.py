@@ -19,7 +19,8 @@ def save_checkpoint(
     accuracy: float,
     output_dir: str,
     model_name: str,
-    is_best: bool = False
+    is_best: bool = False,
+    history: Optional[Dict[str, List[float]]] = None
 ) -> None:
     """
     Salva checkpoint do modelo.
@@ -33,6 +34,7 @@ def save_checkpoint(
         output_dir: Diretório de saída
         model_name: Nome do modelo (para organização)
         is_best: Se True, salva como melhor modelo
+        history: Histórico de treinamento (opcional, para resume)
     """
     # Cria diretório de saída
     model_dir = Path(output_dir) / model_name
@@ -46,6 +48,10 @@ def save_checkpoint(
         'loss': loss,
         'accuracy': accuracy,
     }
+    
+    # Adiciona histórico se fornecido
+    if history is not None:
+        checkpoint['history'] = history
     
     # Salva último checkpoint
     last_path = model_dir / 'last.pt'
