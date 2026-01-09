@@ -127,7 +127,7 @@ Exemplos de uso:
         '--resume',
         type=str,
         default=None,
-        help='Caminho do checkpoint para continuar treinamento (ex: out/MobileNetV2_seed42/last.pt). Se não especificado, tenta detectar automaticamente.'
+        help='Caminho do checkpoint para continuar treinamento (ex: out/MobileNetV2_q10_seed42/last.pt). Se não especificado, tenta detectar automaticamente.'
     )
     
     parser.add_argument(

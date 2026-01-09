@@ -110,11 +110,10 @@ def main():
     
     # Configura early stopping
     output_dir = Path(args.output_dir)
-    # Inclui seed no nome do diretório do modelo se fornecido
+    # Inclui qualidade e seed no nome do diretório do modelo
+    model_dir_name = f"{args.model}_q{args.quality}"
     if args.seed is not None:
-        model_dir_name = f"{args.model}_seed{args.seed}"
-    else:
-        model_dir_name = args.model
+        model_dir_name = f"{model_dir_name}_seed{args.seed}"
     model_output_dir = output_dir / model_dir_name
     best_model_path = model_output_dir / 'best.pt'
     last_checkpoint_path = model_output_dir / 'last.pt'
