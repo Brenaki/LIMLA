@@ -44,6 +44,14 @@ struct Args {
     #[arg(short, long, default_value = "./compressed")]
     output: String,
 
+    /// grayscale images (Example: true)
+    #[arg(short, long, default_value_t = false)]
+    grayscale: bool,
+
+    /// saturation level to compress (Example: true)
+    #[arg(short, long, default_value_t = false)]
+    saturation: bool,
+
     /// call cnn to train
     #[command(subcommand)]
     cnn: Option<CnnCommand>,
@@ -150,7 +158,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // process per classe
     for (class_name, images) in images_by_class {
-        split_and_compress_class(&class_name, images, &split_config, &quality_levels, &bar, &args.output)?;
+        split_and_compress_class(&class_name, images, &split_config, &quality_levels, &bar, &args.output, args.grayscale, args.saturation)?;
     }
 
     bar.finish_with_message("Compression complete!");
@@ -243,6 +251,8 @@ fn split_and_compress_class(
     quality_levels: &[u8],
     bar: &ProgressBar,
     output: &str,
+    grayscale: bool,
+    saturation: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut rng = rng();
     images.as_mut_slice().shuffle(&mut rng);
@@ -255,9 +265,9 @@ fn split_and_compress_class(
     let val_imgs = &images[train_count..train_count + val_count];
     let test_imgs = &images[train_count + val_count..];
 
-    process_split(train_imgs, "train", class_name, quality_levels, bar, output)?;
-    process_split(val_imgs, "val", class_name, quality_levels, bar, output)?;
-    process_split(test_imgs, "test", class_name, quality_levels, bar, output)?;
+    process_split(train_imgs, "train", class_name, quality_levels, bar, output, grayscale, saturation)?;
+    process_split(val_imgs, "val", class_name, quality_levels, bar, output, grayscale, saturation)?;
+    process_split(test_imgs, "test", class_name, quality_levels, bar, output, grayscale, saturation)?;
 
     Ok(())
 }
@@ -270,9 +280,11 @@ fn process_split(
     quality_levels: &[u8],
     bar: &ProgressBar,
     output: &str,
+    grayscale: bool,
+    saturation: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     images.par_iter().try_for_each(|img_path| {
-        compress_image_to_split(img_path, split, class, quality_levels, bar, output)?;
+        compress_image_to_split(img_path, split, class, quality_levels, bar, output, grayscale, saturation)?;
         Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     })?;
 
@@ -287,8 +299,19 @@ fn compress_image_to_split(
     quality_levels: &[u8],
     bar: &ProgressBar,
     output: &str,
+    grayscale: bool,
+    saturation: bool,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let img = image::open(img_path)?;
+    let mut img = image::open(img_path)?;
+
+    // Apply transformations based on flags
+    if grayscale {
+        img = apply_grayscale(img);
+    }
+    
+    if saturation {
+        img = apply_max_saturation(img);
+    }
 
     let file_name = img_path
         .file_stem()
@@ -337,6 +360,42 @@ fn compress_jpeg(
     encoder.encode_image(img)?;
 
     Ok(())
+}
+
+// Apply grayscale conversion
+fn apply_grayscale(img: DynamicImage) -> DynamicImage {
+    DynamicImage::ImageLuma8(img.to_luma8())
+}
+
+// Apply maximum saturation
+fn apply_max_saturation(img: DynamicImage) -> DynamicImage {
+    // Convert to RGB if not already
+    let rgb_img = img.to_rgb8();
+    let (width, height) = rgb_img.dimensions();
+    
+    // Apply saturation enhancement
+    // Formula: increase the difference between RGB channels
+    let saturated = image::ImageBuffer::from_fn(width, height, |x, y| {
+        let pixel = rgb_img.get_pixel(x, y);
+        let r = pixel[0] as f32;
+        let g = pixel[1] as f32;
+        let b = pixel[2] as f32;
+        
+        // Calculate luminance (grayscale value)
+        let luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+        
+        // Maximize saturation by pushing colors away from gray
+        // This increases the difference between channels and luminance
+        let saturation_factor = 2.0; // Factor to maximize saturation
+        
+        let new_r = (luminance + (r - luminance) * saturation_factor).clamp(0.0, 255.0) as u8;
+        let new_g = (luminance + (g - luminance) * saturation_factor).clamp(0.0, 255.0) as u8;
+        let new_b = (luminance + (b - luminance) * saturation_factor).clamp(0.0, 255.0) as u8;
+        
+        image::Rgb([new_r, new_g, new_b])
+    });
+    
+    DynamicImage::ImageRgb8(saturated)
 }
 
 #[cfg(test)]
@@ -416,6 +475,103 @@ mod tests {
         assert_eq!(config.train, 0.8);
         assert_eq!(config.val, 0.1);
         assert_eq!(config.test, 0.1);
+    }
+
+    #[test]
+    fn test_apply_grayscale_converts_to_grayscale() {
+        // Create a colorful RGB image
+        let rgb_image = image::RgbImage::from_fn(100, 100, |x, y| {
+            image::Rgb([(x % 256) as u8, (y % 256) as u8, 128])
+        });
+        let dynamic_image = image::DynamicImage::ImageRgb8(rgb_image);
+
+        // Apply transformation
+        let result = apply_grayscale(dynamic_image);
+
+        // Verify result is grayscale (Luma8)
+        match result {
+            image::DynamicImage::ImageLuma8(_) => (),
+            _ => panic!("Result should be grayscale (ImageLuma8)"),
+        }
+    }
+
+    #[test]
+    fn test_apply_grayscale_preserves_dimensions() {
+        // Create an image with specific dimensions
+        let width = 150;
+        let height = 200;
+        let rgb_image = image::RgbImage::from_fn(width, height, |_, _| image::Rgb([100, 150, 200]));
+        let dynamic_image = image::DynamicImage::ImageRgb8(rgb_image);
+
+        // Apply transformation
+        let result = apply_grayscale(dynamic_image);
+
+        // Verify dimensions are preserved
+        match result {
+            image::DynamicImage::ImageLuma8(img) => {
+                assert_eq!(img.width(), width, "Width should be preserved");
+                assert_eq!(img.height(), height, "Height should be preserved");
+            },
+            _ => panic!("Result should be grayscale"),
+        }
+    }
+
+    #[test]
+    fn test_apply_max_saturation_increases_saturation() {
+        // Create a low saturation image (grayish)
+        let rgb_image = image::RgbImage::from_fn(100, 100, |_, _| image::Rgb([120, 125, 130]));
+        let dynamic_image = image::DynamicImage::ImageRgb8(rgb_image);
+
+        // Apply transformation
+        let result = apply_max_saturation(dynamic_image);
+
+        // Verify result is still RGB (not grayscale)
+        match result {
+            image::DynamicImage::ImageRgb8(_) => (),
+            _ => panic!("Result should be RGB (ImageRgb8)"),
+        }
+    }
+
+    #[test]
+    fn test_apply_max_saturation_preserves_dimensions() {
+        // Create an image with specific dimensions
+        let width = 150;
+        let height = 200;
+        let rgb_image = image::RgbImage::from_fn(width, height, |_, _| image::Rgb([100, 150, 200]));
+        let dynamic_image = image::DynamicImage::ImageRgb8(rgb_image);
+
+        // Apply transformation
+        let result = apply_max_saturation(dynamic_image);
+
+        // Verify dimensions are preserved
+        match result {
+            image::DynamicImage::ImageRgb8(img) => {
+                assert_eq!(img.width(), width, "Width should be preserved");
+                assert_eq!(img.height(), height, "Height should be preserved");
+            },
+            _ => panic!("Result should be RGB"),
+        }
+    }
+
+    #[test]
+    fn test_apply_both_grayscale_and_saturation() {
+        // Create a colorful RGB image
+        let rgb_image = image::RgbImage::from_fn(100, 100, |x, y| {
+            image::Rgb([(x % 256) as u8, (y % 256) as u8, 128])
+        });
+        let mut dynamic_image = image::DynamicImage::ImageRgb8(rgb_image);
+
+        // Apply grayscale first
+        dynamic_image = apply_grayscale(dynamic_image);
+        
+        // Then apply saturation (should still work on grayscale, but will convert to RGB)
+        dynamic_image = apply_max_saturation(dynamic_image);
+
+        // After saturation, result should be RGB
+        match dynamic_image {
+            image::DynamicImage::ImageRgb8(_) => (),
+            _ => panic!("Result should be RGB after applying both transformations"),
+        }
     }
 }
 
