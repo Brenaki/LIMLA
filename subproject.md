@@ -1,170 +1,170 @@
-## ANALISAR O IMPACTO DA COMPRESSÃO COM PERDAS EM MÍDIAS NOS ALGORITMOS DE MACHINE LEARNING
+## ANALYZING THE IMPACT OF LOSSY COMPRESSION ON MEDIA IN MACHINE LEARNING ALGORITHMS
 
-### 1. PALAVRAS-CHAVE
+### 1. KEYWORDS
 
-`Compressão com perdas` • `Machine learning` • `Qualidade de mídia` • `Redes neurais` • `Adversarial attack` • `Robustez de modelos`
-
----
-
-### 2. RESUMO
-
-O uso crescente de Machine Learning (ML), em particular Deep Learning (DL), para processar mídias digitais como imagens, áudio e vídeo é fundamental em áreas como saúde e segurança. O volume massivo de dados requer compressão com perdas para otimizar armazenamento e transmissão, especialmente em ambientes com recursos limitados. 
-
-Contudo, a compressão introduz artefatos e degradações que podem comprometer significativamente o desempenho de modelos ML em tarefas como classificação, detecção e reconhecimento. Exemplos incluem a queda na acurácia em reconhecimento facial sob alta compressão e a degradação na detecção de objetos. 
-
-A relação complexa entre compressão e robustez adversarial também é relevante, pois a compressão pode tanto mitigar quanto potencializar ataques. Este estudo investiga sistematicamente o impacto da compressão em diferentes mídias e redes neurais para entender como as degradações afetam o desempenho e a robustez. 
-
-Os resultados visam informar a construção de sistemas ML mais confiáveis e fornecer recomendações práticas para o uso de dados comprimidos em aplicações reais.
+`Lossy compression` • `Machine learning` • `Media quality` • `Neural networks` • `Adversarial attack` • `Model robustness`
 
 ---
 
-### 3. CARACTERIZAÇÃO E JUSTIFICATIVA
+### 2. ABSTRACT
 
-O uso crescente de algoritmos de Machine Learning (ML), especialmente Deep Learning (DL), para processar mídias digitais como imagens, áudios e vídeos é vital em muitas áreas, como saúde, segurança e automotiva (Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Jacobellis; Cummings; Yadwadkar, 2024). 
+The growing use of Machine Learning (ML), particularly Deep Learning (DL), to process digital media such as images, audio, and video is fundamental in areas such as healthcare and security. The massive volume of data requires lossy compression to optimize storage and transmission, especially in resource-constrained environments.
 
-Contudo, o grande volume desses dados exige frequentemente o uso de **compressão com perdas** (*lossy compression*) para otimizar armazenamento e transmissão, particularmente em locais com recursos limitados ou restrições de banda (Baris et al., 2025; Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Yasin; Abdulazeez, 2021).
+However, compression introduces artifacts and degradations that can significantly compromise ML model performance in tasks such as classification, detection, and recognition. Examples include the drop in accuracy in facial recognition under high compression and the degradation in object detection.
 
-#### Impactos da Compressão com Perdas
+The complex relationship between compression and adversarial robustness is also relevant, as compression can both mitigate and amplify attacks. This study systematically investigates the impact of compression on different media and neural networks to understand how degradations affect performance and robustness.
 
-A compressão com perdas, embora eficiente em reduzir o tamanho dos arquivos, introduz artefatos e degradações que podem comprometer severamente o desempenho dos modelos de ML:
-
-- **Reconhecimento facial:** A acurácia pode diminuir sob compressão severa (Ferreira; Do Couto; De Melo Baptista Domingues, 2025)
-- **Detecção de objetos:** O desempenho sofre degradação, especialmente com ruído adicional (Baris et al., 2025)
-- **Imagens médicas:** Mesmo com compressão irreversível comum (JPEG, JPEG2000), o impacto nos modelos DL varia, e não há consenso sobre o limiar de compressão (Urbaniak, 2024)
-- **Áudio:** Modelos podem ter desempenho reduzido ao encontrar parâmetros de codificação não vistos no treinamento (Koops; Micchi; Quinton, 2024)
-
-Adicionalmente, a compressão pode tanto mitigar quanto potencializar ataques adversariais, o que adiciona outra camada de complexidade à sua relação com a robustez de modelos ML (Niu; Yang, 2023; Yin et al., 2020).
-
-#### Relevância da Pesquisa
-
-Diante disso, uma investigação sistemática do impacto da compressão com perdas em diversas mídias e arquiteturas de redes neurais é crucial (Ferreira; Do Couto; De Melo Baptista Domingues, 2025). Os resultados podem ajudar a construir sistemas de ML mais robustos, eficientes e seguros e oferecer recomendações práticas para o uso de mídias comprimidas em aplicações do mundo real.
+The results aim to inform the construction of more reliable ML systems and provide practical recommendations for the use of compressed data in real-world applications.
 
 ---
 
-### 4. OBJETIVOS
+### 3. CHARACTERIZATION AND JUSTIFICATION
 
-#### Objetivo Geral
+The growing use of Machine Learning (ML) algorithms, especially Deep Learning (DL), to process digital media such as images, audio, and video is vital in many areas, including healthcare, security, and automotive (Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Jacobellis; Cummings; Yadwadkar, 2024).
 
-Investigar sistematicamente o impacto da compressão com perdas em mídias digitais no desempenho de modelos de ML, considerando a severidade da compressão, diferentes tipos de mídia, arquiteturas de redes neurais e a sua interação em cenários com ataques adversariais.
+However, the large volume of this data often requires the use of **lossy compression** to optimize storage and transmission, particularly in locations with limited resources or bandwidth constraints (Baris et al., 2025; Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Yasin; Abdulazeez, 2021).
 
-#### Objetivos Específicos
+#### Impacts of Lossy Compression
 
-1. Avaliar o desempenho de modelos de DL em tarefas específicas, como classificação e detecção, utilizando mídias submetidas a diferentes níveis de severidade de compressão
+Lossy compression, although efficient in reducing file sizes, introduces artifacts and degradations that can severely compromise ML model performance:
 
-2. Comparar o impacto das degradações da compressão em diferentes tipos de mídia, como imagens, áudios e vídeos, em modelos de ML
+- **Facial recognition:** Accuracy may decrease under severe compression (Ferreira; Do Couto; De Melo Baptista Domingues, 2025)
+- **Object detection:** Performance suffers degradation, especially with additional noise (Baris et al., 2025)
+- **Medical images:** Even with common irreversible compression (JPEG, JPEG2000), the impact on DL models varies, and there is no consensus on the compression threshold (Urbaniak, 2024)
+- **Audio:** Models may have reduced performance when encountering encoding parameters not seen during training (Koops; Micchi; Quinton, 2024)
 
-3. Investigar o efeito da compressão com perdas em redes neurais profundas durante as fases de treinamento e inferência
+Additionally, compression can both mitigate and amplify adversarial attacks, which adds another layer of complexity to its relationship with ML model robustness (Niu; Yang, 2023; Yin et al., 2020).
 
-4. Analisar a interação entre compressão com perdas e ataques adversariais, investigando se a compressão pode atuar como defesa ou introduzir vulnerabilidades adicionais para os modelos de ML
+#### Research Relevance
+
+Given this, a systematic investigation of the impact of lossy compression on diverse media and neural network architectures is crucial (Ferreira; Do Couto; De Melo Baptista Domingues, 2025). The results can help build more robust, efficient, and secure ML systems and offer practical recommendations for the use of compressed media in real-world applications.
 
 ---
 
-### 5. METODOLOGIA E ESTRATÉGIA DE AÇÃO
+### 4. OBJECTIVES
 
-#### Etapa 1: Levantamento e Seleção de Tipos de Mídia
+#### General Objective
 
-Inicialmente, será realizado um levantamento sistemático de bases de dados públicas amplamente reconhecidas como benchmarks em ML, abrangendo imagens, áudios e vídeos. 
+Systematically investigate the impact of lossy compression on digital media on ML model performance, considering compression severity, different types of media, neural network architectures, and their interaction in scenarios with adversarial attacks.
 
-A seleção dessas bases considerará:
-- Diversidade de cenários e tarefas de percepção (classificação e detecção)
-- Disponibilidade de anotações
-- Representatividade de condições reais, incluindo presença de ruído e artefatos
+#### Specific Objectives
 
-Esta etapa é fundamental para garantir que os experimentos reflitam desafios práticos enfrentados em aplicações reais (Baris et al., 2025; Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Jacobellis; Cummings; Yadwadkar, 2024; Niu; Yang, 2023; Obaid; Kadhim, 2025).
+1. Evaluate the performance of DL models in specific tasks, such as classification and detection, using media subjected to different levels of compression severity
 
-#### Etapa 2: Levantamento e Aplicação de Algoritmos de Compressão com Perda
+2. Compare the impact of compression degradations on different types of media, such as images, audio, and video, in ML models
 
-Com as mídias selecionadas, será feito um levantamento dos principais algoritmos de compressão com perda relevantes para cada tipo de dado:
+3. Investigate the effect of lossy compression on deep neural networks during training and inference phases
 
-- **Imagens e vídeos:** JPEG, JPEG2000, H.264, HEVC
-- **Áudio:** MP3, Opus
+4. Analyze the interaction between lossy compression and adversarial attacks, investigating whether compression can act as a defense or introduce additional vulnerabilities for ML models
 
-Serão aplicados múltiplos níveis de compressão, variando parâmetros como:
+---
+
+### 5. METHODOLOGY AND ACTION STRATEGY
+
+#### Stage 1: Survey and Selection of Media Types
+
+Initially, a systematic survey of publicly recognized databases as ML benchmarks will be conducted, covering images, audio, and video.
+
+The selection of these databases will consider:
+- Diversity of scenarios and perception tasks (classification and detection)
+- Availability of annotations
+- Representativeness of real-world conditions, including presence of noise and artifacts
+
+This stage is fundamental to ensure that experiments reflect practical challenges faced in real applications (Baris et al., 2025; Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Jacobellis; Cummings; Yadwadkar, 2024; Niu; Yang, 2023; Obaid; Kadhim, 2025).
+
+#### Stage 2: Survey and Application of Lossy Compression Algorithms
+
+With the selected media, a survey of the main lossy compression algorithms relevant to each data type will be conducted:
+
+- **Images and video:** JPEG, JPEG2000, H.264, HEVC
+- **Audio:** MP3, Opus
+
+Multiple compression levels will be applied, varying parameters such as:
 - **QP** (Quantization Parameter)
 - **QF** (Quality Factor)
 
-Essa abordagem permitirá analisar o impacto progressivo da compressão sobre a qualidade dos dados e, consequentemente, sobre o desempenho dos modelos (Baris et al., 2025; Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Obaid; Kadhim, 2025; Perepelytsia; Dellwo, 2023; Yin et al., 2020).
+This approach will allow analyzing the progressive impact of compression on data quality and, consequently, on model performance (Baris et al., 2025; Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Obaid; Kadhim, 2025; Perepelytsia; Dellwo, 2023; Yin et al., 2020).
 
-#### Etapa 3: Seleção e Treinamento de Arquiteturas de Redes Neurais Profundas
+#### Stage 3: Selection and Training of Deep Neural Network Architectures
 
-Na sequência, serão selecionadas arquiteturas de redes neurais profundas adequadas a cada mídia e tarefa:
+Next, deep neural network architectures suitable for each media type and task will be selected:
 
-- **CNNs** para classificação de imagens
-- **Modelos de detecção** para imagens e vídeos
-- **Arquiteturas específicas** para processamento de áudio
+- **CNNs** for image classification
+- **Detection models** for images and video
+- **Specific architectures** for audio processing
 
-Os modelos serão treinados tanto com dados originais quanto com versões comprimidas, permitindo avaliar como diferentes arquiteturas respondem à compressão durante o treinamento e a inferência (Ahmad et al., 2021; Baris et al., 2025; Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Obaid; Kadhim, 2025; Urbaniak, 2024).
+Models will be trained with both original and compressed data, allowing evaluation of how different architectures respond to compression during training and inference (Ahmad et al., 2021; Baris et al., 2025; Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Obaid; Kadhim, 2025; Urbaniak, 2024).
 
-#### Etapa 4: Avaliação Quantitativa e Análise de Robustez
+#### Stage 4: Quantitative Evaluation and Robustness Analysis
 
-O desempenho dos modelos será avaliado por meio de métricas quantitativas apropriadas:
+Model performance will be evaluated through appropriate quantitative metrics:
 
-**Para classificação e detecção:**
-- Acurácia
-- Precisão
+**For classification and detection:**
+- Accuracy
+- Precision
 - Recall
 - F1-score
 
-**Para robustez adversarial:**
+**For adversarial robustness:**
 - Robust Accuracy
 - TASR
 
-A avaliação será conduzida em diferentes níveis de compressão, buscando compreender a capacidade de generalização e a robustez dos modelos em cenários realistas de degradação dos dados (Ahmad et al., 2021; Baris et al., 2025; Ferreira; Couto, 2025; Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Niu; Yang, 2023).
+The evaluation will be conducted at different compression levels, seeking to understand the generalization capacity and robustness of models in realistic data degradation scenarios (Ahmad et al., 2021; Baris et al., 2025; Ferreira; Couto, 2025; Ferreira; Do Couto; De Melo Baptista Domingues, 2025; Niu; Yang, 2023).
 
 ---
 
-### 6. RESULTADOS ESPERADOS
+### 6. EXPECTED RESULTS
 
-Espera-se identificar como diferentes níveis de compressão com perdas afetam o desempenho de algoritmos de ML em tarefas de classificação e detecção, considerando diferentes tipos de mídia e arquiteturas de redes neurais. 
+It is expected to identify how different levels of lossy compression affect the performance of ML algorithms in classification and detection tasks, considering different types of media and neural network architectures.
 
-Os resultados devem:
+The results should:
 
-✓ Indicar limites de compressão aceitáveis para cada tipo de mídia e aplicação
+✓ Indicate acceptable compression limits for each media type and application
 
-✓ Fornecer subsídios para o desenvolvimento de modelos mais robustos a artefatos de compressão
+✓ Provide support for the development of models more robust to compression artifacts
 
-✓ Contribuir para a compreensão da relação entre compressão e ataques adversariais
+✓ Contribute to understanding the relationship between compression and adversarial attacks
 
 ---
 
-### 7. REFERÊNCIAS
+### 7. REFERENCES
 
-AHMAD, Aanis et al. Performance of deep learning models for classifying and detecting common weeds in corn and soybean production systems. **Computers and Electronics in Agriculture**, v. 184, p. 106081, maio 2021.
+AHMAD, Aanis et al. Performance of deep learning models for classifying and detecting common weeds in corn and soybean production systems. **Computers and Electronics in Agriculture**, v. 184, p. 106081, May 2021.
 
 BARIS, Gabriele et al. Automotive DNN-Based Object Detection in the Presence of Lens Obstruction and Video Compression. **IEEE Access**, v. 13, p. 36575-36589, 2025.
 
-FERREIRA, Fernando Rodrigues Trindade; COUTO, Loena Marins Do. Development of a computational deep learning model for detecting people in aerial images and videos degraded by compression artifacts. **Earth Science Informatics**, v. 18, n. 2, p. 408, jun. 2025.
+FERREIRA, Fernando Rodrigues Trindade; COUTO, Loena Marins Do. Development of a computational deep learning model for detecting people in aerial images and videos degraded by compression artifacts. **Earth Science Informatics**, v. 18, n. 2, p. 408, Jun. 2025.
 
-FERREIRA, Fernando Rodrigues Trindade; DO COUTO, Loena Marins; DE MELO BAPTISTA DOMINGUES, Guilherme. Comparing the efficiency of YOLO-M for face recognition in images and videos degraded by compression artifacts. **Evolving Systems**, v. 16, n. 2, p. 70, jun. 2025.
+FERREIRA, Fernando Rodrigues Trindade; DO COUTO, Loena Marins; DE MELO BAPTISTA DOMINGUES, Guilherme. Comparing the efficiency of YOLO-M for face recognition in images and videos degraded by compression artifacts. **Evolving Systems**, v. 16, n. 2, p. 70, Jun. 2025.
 
-JACOBELLIS, Dan; CUMMINGS, Daniel; YADWADKAR, Neeraja J. **Machine Perceptual Quality: Evaluating the Impact of Severe Lossy Compression on Audio and Image Models**. arXiv, 15 jan. 2024. Disponível em: <http://arxiv.org/abs/2401.07957>. Acesso em: 8 jun. 2025.
+JACOBELLIS, Dan; CUMMINGS, Daniel; YADWADKAR, Neeraja J. **Machine Perceptual Quality: Evaluating the Impact of Severe Lossy Compression on Audio and Image Models**. arXiv, Jan. 15, 2024. Available at: <http://arxiv.org/abs/2401.07957>. Accessed: Jun. 8, 2025.
 
-KOOPS, Hendrik Vincent; MICCHI, Gianluca; QUINTON, Elio. **Robust Lossy Audio Compression Identification**. arXiv, 31 jul. 2024. Disponível em: <http://arxiv.org/abs/2407.21545>. Acesso em: 8 jun. 2025.
+KOOPS, Hendrik Vincent; MICCHI, Gianluca; QUINTON, Elio. **Robust Lossy Audio Compression Identification**. arXiv, Jul. 31, 2024. Available at: <http://arxiv.org/abs/2407.21545>. Accessed: Jun. 8, 2025.
 
-NIU, Zhong-Han; YANG, Yu-Bin. Defense Against Adversarial Attacks with Efficient Frequency-Adaptive Compression and Reconstruction. **Pattern Recognition**, v. 138, p. 109382, jun. 2023.
+NIU, Zhong-Han; YANG, Yu-Bin. Defense Against Adversarial Attacks with Efficient Frequency-Adaptive Compression and Reconstruction. **Pattern Recognition**, v. 138, p. 109382, Jun. 2023.
 
-OBAID, Ali A.; KADHIM, Hasan M. Deep Learning for Lossless Audio Compression. **Journal of Engineering**, v. 31, n. 4, p. 100-112, 1 abr. 2025.
+OBAID, Ali A.; KADHIM, Hasan M. Deep Learning for Lossless Audio Compression. **Journal of Engineering**, v. 31, n. 4, p. 100-112, Apr. 1, 2025.
 
-PEREPELYTSIA, Valeriia; DELLWO, Volker. Acoustic compression in Zoom audio does not compromise voice recognition performance. **Scientific Reports**, v. 13, n. 1, p. 18742, 31 out. 2023.
+PEREPELYTSIA, Valeriia; DELLWO, Volker. Acoustic compression in Zoom audio does not compromise voice recognition performance. **Scientific Reports**, v. 13, n. 1, p. 18742, Oct. 31, 2023.
 
-URBANIAK, Ilona Anna. Using Compressed JPEG and JPEG2000 Medical Images in Deep Learning: A Review. **Applied Sciences**, v. 14, n. 22, p. 10524, 15 nov. 2024.
+URBANIAK, Ilona Anna. Using Compressed JPEG and JPEG2000 Medical Images in Deep Learning: A Review. **Applied Sciences**, v. 14, n. 22, p. 10524, Nov. 15, 2024.
 
-YASIN, Hajar Maseeh; ABDULAZEEZ, Adnan Mohsin. Image Compression Based on Deep Learning: A Review. **Asian Journal of Research in Computer Science**, p. 62-76, 1 maio 2021.
+YASIN, Hajar Maseeh; ABDULAZEEZ, Adnan Mohsin. Image Compression Based on Deep Learning: A Review. **Asian Journal of Research in Computer Science**, p. 62-76, May 1, 2021.
 
-YIN, Zhaoxia et al. Defense against adversarial attacks by low‐level image transformations. **International Journal of Intelligent Systems**, v. 35, n. 10, p. 1453-1466, out. 2020.
+YIN, Zhaoxia et al. Defense against adversarial attacks by low‐level image transformations. **International Journal of Intelligent Systems**, v. 35, n. 10, p. 1453-1466, Oct. 2020.
 
 ---
 
-### 8. CRONOGRAMA DE EXECUÇÃO
+### 8. EXECUTION SCHEDULE
 
-| **Atividades** | **Set/25** | **Out** | **Nov** | **Dez** | **Jan** | **Fev** | **Mar** | **Abr** | **Mai** | **Jun** | **Jul** | **Ago/26** |
+| **Activities** | **Sep/25** | **Oct** | **Nov** | **Dec** | **Jan** | **Feb** | **Mar** | **Apr** | **May** | **Jun** | **Jul** | **Aug/26** |
 |----------------|:----------:|:-------:|:-------:|:-------:|:-------:|:-------:|:-------:|:-------:|:-------:|:-------:|:-------:|:----------:|
-| Seleção de bases de dados e compressão das mídias | ✓ | ✓ | | | | | | | | | | |
-| Treinamento e avaliação dos modelos | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | | | |
-| **Relatório Semestral** (até último dia útil de março/2026) | | | | | | | ✓ | | | | | |
-| Implementação de ataques adversariais e análise | | | | | | | ✓ | ✓ | ✓ | ✓ | | |
-| Análise dos resultados e elaboração de recomendações | | | | | | | | | ✓ | ✓ | ✓ | |
-| **Relatório Final** (até último dia útil de setembro/2026) | | | | | | | | | | | | ✓ |
-| Inscrição e submissão de trabalho no EAIC 2026 | | | | | | | | | | | | A definir |
+| Database selection and media compression | ✓ | ✓ | | | | | | | | | | |
+| Model training and evaluation | | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | | | |
+| **Semester Report** (by last business day of March 2026) | | | | | | | ✓ | | | | | |
+| Adversarial attack implementation and analysis | | | | | | | ✓ | ✓ | ✓ | ✓ | | |
+| Results analysis and recommendation development | | | | | | | | | ✓ | ✓ | ✓ | |
+| **Final Report** (by last business day of September 2026) | | | | | | | | | | | | ✓ |
+| EAIC 2026 registration and paper submission | | | | | | | | | | | | TBD |
 
 ---

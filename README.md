@@ -71,7 +71,11 @@ LIMLA/
 │   │   └── test_image.py    # Individual image testing
 │   ├── main.py              # Main entry point
 │   └── README.md            # CNN module documentation
+├── docs/
+│   └── i18n/
+│       └── pt/              # Portuguese (Brazilian) translations
 ├── Cargo.toml               # Rust dependencies
+├── ROADMAP.md               # Project roadmap
 ├── subproject.md            # Research project documentation
 └── README.md                # This file
 ```
@@ -260,6 +264,14 @@ The project follows a systematic methodology:
 ## 📝 References
 
 This project is based on academic research on the impact of lossy compression on Machine Learning (ML) models. For more details on the theoretical foundation, see `subproject.md`.
+
+## 🌐 Translations
+
+Documentation is available in other languages:
+
+| Language | Path |
+|----------|------|
+| Português Brasileiro | [docs/i18n/pt/](docs/i18n/pt/) |
 
 ## 🤝 Contributing
 
