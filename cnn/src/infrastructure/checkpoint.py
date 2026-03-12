@@ -4,6 +4,7 @@ Salvamento e carregamento de checkpoints do modelo.
 
 import os
 import csv
+import pickle
 from pathlib import Path
 from datetime import datetime
 import torch
@@ -11,6 +12,49 @@ import torch.nn as nn
 from typing import Optional, Dict, List
 
 from src.data.quality_paths import QualityValue, normalize_quality_value, quality_tag
+
+
+class CheckpointLoadError(RuntimeError):
+    """Erro ao carregar checkpoint serializado."""
+
+
+def _atomic_torch_save(checkpoint: Dict, destination: Path) -> None:
+    """
+    Salva checkpoint de forma atômica para reduzir risco de arquivo truncado.
+    """
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = destination.with_name(
+        f".{destination.name}.tmp-{os.getpid()}-{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    )
+
+    try:
+        with open(temp_path, 'wb') as temp_file:
+            torch.save(checkpoint, temp_file)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.replace(temp_path, destination)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+
+
+def quarantine_checkpoint(checkpoint_path: str | Path) -> Path:
+    """
+    Move checkpoint inválido para um nome de quarentena com timestamp.
+    """
+    source_path = Path(checkpoint_path)
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    quarantined_path = source_path.with_name(f"{source_path.name}.corrupted-{timestamp}")
+    suffix = 1
+
+    while quarantined_path.exists():
+        quarantined_path = source_path.with_name(
+            f"{source_path.name}.corrupted-{timestamp}-{suffix}"
+        )
+        suffix += 1
+
+    source_path.rename(quarantined_path)
+    return quarantined_path
 
 
 def save_checkpoint(
@@ -57,12 +101,12 @@ def save_checkpoint(
     
     # Salva último checkpoint
     last_path = model_dir / 'last.pt'
-    torch.save(checkpoint, last_path)
+    _atomic_torch_save(checkpoint, last_path)
     
     # Salva melhor modelo se indicado
     if is_best:
         best_path = model_dir / 'best.pt'
-        torch.save(checkpoint, best_path)
+        _atomic_torch_save(checkpoint, best_path)
         
         # Salva também informações adicionais
         info_path = model_dir / 'info.json'
@@ -95,14 +139,31 @@ def load_checkpoint(
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"Checkpoint não encontrado: {checkpoint_path}")
     
-    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    try:
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    except (EOFError, pickle.UnpicklingError, RuntimeError) as exc:
+        raise CheckpointLoadError(
+            f"Falha ao desserializar checkpoint {checkpoint_path}: {exc}"
+        ) from exc
     
+    try:
+        model_state_dict = checkpoint['model_state_dict']
+    except (TypeError, KeyError) as exc:
+        raise CheckpointLoadError(
+            f"Checkpoint {checkpoint_path} não possui model_state_dict válido"
+        ) from exc
+
     # Carrega pesos do modelo
-    model.load_state_dict(checkpoint['model_state_dict'])
+    model.load_state_dict(model_state_dict)
     
     # Carrega estado do optimizer se fornecido
     if optimizer is not None and 'optimizer_state_dict' in checkpoint:
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        try:
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        except ValueError as exc:
+            raise CheckpointLoadError(
+                f"Checkpoint {checkpoint_path} possui optimizer_state_dict inválido"
+            ) from exc
     
     return checkpoint
 

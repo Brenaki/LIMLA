@@ -17,7 +17,8 @@ from src.data.quality_paths import find_original_dir, quality_tag
 from src.infrastructure.model_builder import build_model
 from src.infrastructure.checkpoint import (
     save_checkpoint, save_classes_mapping, save_results_to_csv,
-    save_test_results_to_csv, load_checkpoint
+    save_test_results_to_csv, load_checkpoint, CheckpointLoadError,
+    quarantine_checkpoint
 )
 from src.use_cases.train import train_model, evaluate_test
 from src.use_cases.early_stopping import EarlyStopping
@@ -138,16 +139,44 @@ def main():
     
     # Carrega checkpoint se encontrado
     if resume_from:
-        print(f"Carregando checkpoint de: {resume_from}")
-        checkpoint = load_checkpoint(str(resume_from), model, optimizer)
-        start_epoch = checkpoint.get('epoch', 0) + 1  # Próxima época a treinar
-        history = checkpoint.get('history', None)
-        # Garante que modelo está no device correto
-        model = model.to(device)
-        print(f"Checkpoint carregado: época {checkpoint.get('epoch', 0) + 1}, "
-              f"loss={checkpoint.get('loss', 0):.4f}, "
-              f"accuracy={checkpoint.get('accuracy', 0):.2f}%")
-        print(f"Continuando da época {start_epoch + 1}/{args.epochs}")
+        auto_resume = not args.resume
+        resume_candidates = [resume_from]
+        if auto_resume and best_model_path.exists() and best_model_path != resume_from:
+            resume_candidates.append(best_model_path)
+
+        checkpoint = None
+        loaded_checkpoint_path = None
+
+        for candidate in resume_candidates:
+            print(f"Carregando checkpoint de: {candidate}")
+            try:
+                checkpoint = load_checkpoint(str(candidate), model, optimizer)
+                loaded_checkpoint_path = candidate
+                break
+            except CheckpointLoadError as exc:
+                if not auto_resume:
+                    print(f"ERRO: Checkpoint inválido ou corrompido: {exc}")
+                    return
+
+                quarantined_path = quarantine_checkpoint(candidate)
+                print(f"AVISO: Checkpoint inválido ou corrompido: {exc}")
+                print(f"Arquivo movido para: {quarantined_path}")
+                if candidate == resume_from and best_model_path.exists():
+                    print(f"Tentando fallback com: {best_model_path}")
+
+        if checkpoint:
+            start_epoch = checkpoint.get('epoch', 0) + 1  # Próxima época a treinar
+            history = checkpoint.get('history', None)
+            # Garante que modelo está no device correto
+            model = model.to(device)
+            print(f"Checkpoint carregado: época {checkpoint.get('epoch', 0) + 1}, "
+                  f"loss={checkpoint.get('loss', 0):.4f}, "
+                  f"accuracy={checkpoint.get('accuracy', 0):.2f}%")
+            print(f"Continuando da época {start_epoch + 1}/{args.epochs}")
+            if loaded_checkpoint_path != resume_from:
+                print(f"Resume retomado a partir do fallback: {loaded_checkpoint_path}")
+        elif auto_resume:
+            print("Nenhum checkpoint válido disponível. Reiniciando treino do zero.")
     
     early_stopping = EarlyStopping(
         patience=args.patience,
@@ -263,10 +292,17 @@ def main():
     best_model_path = model_output_dir / 'best.pt'
     if best_model_path.exists():
         print(f"\nCarregando melhor modelo de: {best_model_path}")
-        checkpoint = load_checkpoint(str(best_model_path), model, optimizer=None)
-        best_epoch = checkpoint.get('epoch', best_epoch_idx) + 1
-        # Garante que modelo está no device correto
-        model = model.to(device)
+        try:
+            checkpoint = load_checkpoint(str(best_model_path), model, optimizer=None)
+            best_epoch = checkpoint.get('epoch', best_epoch_idx) + 1
+            # Garante que modelo está no device correto
+            model = model.to(device)
+        except CheckpointLoadError as exc:
+            quarantined_path = quarantine_checkpoint(best_model_path)
+            print(f"AVISO: Melhor modelo inválido ou corrompido: {exc}")
+            print(f"Arquivo movido para: {quarantined_path}")
+            print("Usando modelo atual em memória para avaliação.")
+            best_epoch = best_epoch_idx + 1
     else:
         print("AVISO: Melhor modelo não encontrado, usando modelo atual")
         best_epoch = best_epoch_idx + 1
