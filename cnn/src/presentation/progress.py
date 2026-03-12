@@ -54,7 +54,8 @@ def print_config(args) -> None:
     print("="*60)
     print(f"Modelo: {args.model}")
     print(f"Diretório de dados: {args.data_dir}")
-    print(f"Qualidade: q{args.quality}")
+    quality_label = f"q{args.quality}" if args.quality != 'original' else 'original'
+    print(f"Qualidade: {quality_label}")
     print(f"Épocas: {args.epochs}")
     print(f"Batch size: {args.batch_size}")
     print(f"Learning rate: {args.learning_rate}")

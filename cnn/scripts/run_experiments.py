@@ -13,8 +13,18 @@ from datetime import datetime
 import re
 import random
 
+# Adiciona diretório raiz ao path para importar módulos
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-def setup_logging(log_dir: Path, model: str, train_quality: int, seed: int) -> logging.Logger:
+from src.data.quality_paths import (
+    QualityValue,
+    normalize_quality_value,
+    quality_tag,
+    validate_quality_value,
+)
+
+
+def setup_logging(log_dir: Path, model: str, train_quality: QualityValue, seed: int) -> logging.Logger:
     """
     Configura logging para uma run específica.
     
@@ -28,10 +38,12 @@ def setup_logging(log_dir: Path, model: str, train_quality: int, seed: int) -> l
         Logger configurado
     """
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / f"{model}_q{train_quality}_seed{seed}.log"
+    run_quality = quality_tag(train_quality)
+    log_file = log_dir / f"{model}_{run_quality}_seed{seed}.log"
     
-    logger = logging.getLogger(f"{model}_q{train_quality}_seed{seed}")
+    logger = logging.getLogger(f"{model}_{run_quality}_seed{seed}")
     logger.setLevel(logging.INFO)
+    logger.handlers.clear()
     
     # Handler para arquivo
     file_handler = logging.FileHandler(log_file)
@@ -57,7 +69,7 @@ def setup_logging(log_dir: Path, model: str, train_quality: int, seed: int) -> l
 def check_if_already_run(
     csv_path: Path,
     model: str,
-    train_quality: int,
+    train_quality: QualityValue,
     seed: int
 ) -> bool:
     """
@@ -80,7 +92,7 @@ def check_if_already_run(
         
         # Verifica se existe linha com esta combinação
         # Para test split, best epoch, accuracy
-        run_id = f"{model}_q{train_quality}_seed{seed}"
+        run_id = f"{model}_{quality_tag(train_quality)}_seed{seed}"
         
         exists = (
             (df['run_id'] == run_id) &
@@ -97,7 +109,7 @@ def check_if_already_run(
 
 def run_training(
     model: str,
-    train_quality: int,
+    train_quality: QualityValue,
     seed: int,
     data_dir: str,
     output_dir: str,
@@ -127,7 +139,7 @@ def run_training(
     """
     log = logger.info if logger else print
     
-    log(f"Iniciando treinamento: {model}, q={train_quality}, seed={seed}")
+    log(f"Iniciando treinamento: {model}, quality={quality_tag(train_quality)}, seed={seed}")
     
     cmd = [
         sys.executable,
@@ -248,10 +260,10 @@ def main():
     )
     parser.add_argument(
         '--train_qualities',
-        type=int,
+        type=str,
         nargs='+',
-        default=[1, 5, 10],
-        help='Qualidades de treino'
+        default=['1', '5', '10'],
+        help="Qualidades de treino (ex: 1 5 10 original)"
     )
     parser.add_argument(
         '--seeds',
@@ -291,6 +303,13 @@ def main():
     )
     
     args = parser.parse_args()
+    try:
+        args.train_qualities = [
+            validate_quality_value(normalize_quality_value(q))
+            for q in args.train_qualities
+        ]
+    except ValueError as exc:
+        parser.error(str(exc))
     
     # Cria diretórios
     output_dir = Path(args.output_dir)
@@ -323,7 +342,10 @@ def main():
             for seed in args.seeds:
                 # Verifica se já existe
                 if args.skip_existing and check_if_already_run(csv_path, model, train_q, seed):
-                    print(f"Pulando {model} q{train_q} seed{seed} (já existe no CSV)")
+                    print(
+                        f"Pulando {model} {quality_tag(train_q)} seed{seed} "
+                        "(já existe no CSV)"
+                    )
                     skipped += 1
                     continue
                 

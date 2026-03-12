@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional, Tuple, List
 
 from .dataset import ImageClassificationDataset
+from .quality_paths import QualityValue, find_original_dir, normalize_quality_value
 
 
 def worker_init_fn(worker_id: int) -> None:
@@ -62,7 +63,7 @@ def get_transforms(is_training: bool = True) -> transforms.Compose:
 
 def create_dataloaders(
     data_dir: str,
-    quality: int,
+    quality: QualityValue,
     batch_size: int = 32,
     num_workers: int = 4,
     classes: Optional[list] = None,
@@ -73,7 +74,7 @@ def create_dataloaders(
     
     Args:
         data_dir: Diretório base dos dados
-        quality: Qualidade da imagem (1, 5, ou 10)
+        quality: Qualidade da imagem (1, 5, 10, etc) ou 'original'
         batch_size: Tamanho do batch
         num_workers: Número de workers para carregamento de dados
         classes: Lista de classes (opcional, detecta automaticamente se None)
@@ -82,10 +83,12 @@ def create_dataloaders(
     Returns:
         Tupla (train_loader, val_loader, classes)
     """
+    normalized_quality = normalize_quality_value(quality)
+
     # Cria datasets
     train_dataset = ImageClassificationDataset(
         data_dir=data_dir,
-        quality=quality,
+        quality=normalized_quality,
         split='train',
         classes=classes,
         transform=get_transforms(is_training=True)
@@ -93,7 +96,7 @@ def create_dataloaders(
     
     val_dataset = ImageClassificationDataset(
         data_dir=data_dir,
-        quality=quality,
+        quality=normalized_quality,
         split='val',
         classes=train_dataset.get_classes(),  # Usa as mesmas classes do treino
         transform=get_transforms(is_training=False)
@@ -157,8 +160,10 @@ def create_test_loader(
     Returns:
         Tupla (test_loader, classes)
     """
+    normalized_test_quality = normalize_quality_value(test_quality)
+
     # Se test_quality é 'original', usa original_data_dir ou estrutura especial
-    if test_quality == 'original':
+    if normalized_test_quality == 'original':
         if original_data_dir:
             # Usa diretório original fornecido
             # Assume estrutura: original_data_dir/test/{class}/
@@ -172,17 +177,9 @@ def create_test_loader(
                 custom_split_path=custom_path
             )
         else:
-            # Tenta encontrar pasta original em data_dir (qualquer pasta que não seja q*)
             data_dir_path = Path(data_dir)
-            original_dir = None
-            
-            for item in data_dir_path.iterdir():
-                if item.is_dir() and not item.name.startswith('q'):
-                    test_dir = item / 'test'
-                    if test_dir.exists():
-                        original_dir = item
-                        break
-            
+            original_dir = find_original_dir(data_dir_path, split='test')
+
             if original_dir:
                 custom_path = str(original_dir / 'test')
                 test_dataset = ImageClassificationDataset(
@@ -228,7 +225,7 @@ def create_test_loader(
                     )
     else:
         # Qualidade numérica
-        quality_int = int(test_quality)
+        quality_int = int(normalized_test_quality)
         test_dataset = ImageClassificationDataset(
             data_dir=data_dir,
             quality=quality_int,

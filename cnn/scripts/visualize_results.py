@@ -10,6 +10,12 @@ import seaborn as sns
 from pathlib import Path
 from scipy import stats
 from typing import Optional
+import sys
+
+# Adiciona diretório raiz ao path para importar módulos
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.data.quality_paths import train_quality_sort_key
 
 
 def calculate_confidence_interval(data: np.ndarray, confidence: float = 0.95) -> tuple:
@@ -97,7 +103,7 @@ def plot_test_accuracy_vs_quality(
     
     # Prepara dados para plot
     models = filtered['model'].unique()
-    train_qualities = sorted(filtered['train_quality'].unique())
+    train_qualities = sorted(filtered['train_quality'].unique(), key=train_quality_sort_key)
     
     # Cria figura com subplots
     n_facets = len(train_qualities)
@@ -185,7 +191,7 @@ def plot_test_accuracy_distribution(
     filtered = fix_test_quality_order(filtered)
     
     # Prepara dados
-    train_qualities = sorted(filtered['train_quality'].unique())
+    train_qualities = sorted(filtered['train_quality'].unique(), key=train_quality_sort_key)
     n_facets = len(train_qualities)
     
     fig, axes = plt.subplots(1, n_facets, figsize=(6*n_facets, 5))

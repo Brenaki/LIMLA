@@ -1,14 +1,16 @@
 """
 Dataset PyTorch customizado para classificação de imagens.
 Carrega imagens da estrutura: {data_dir}/q{quality}/{split}/{class}/*.jpg
+ou {data_dir}/original/{split}/{class}/*.jpg.
 """
 
-import os
 from pathlib import Path
 from typing import List, Tuple, Optional
 from PIL import Image
 import torch
 from torch.utils.data import Dataset
+
+from .quality_paths import QualityValue, resolve_quality_split_dir
 
 
 class ImageClassificationDataset(Dataset):
@@ -22,7 +24,7 @@ class ImageClassificationDataset(Dataset):
     def __init__(
         self,
         data_dir: str,
-        quality: int,
+        quality: QualityValue,
         split: str,
         classes: Optional[List[str]] = None,
         transform: Optional[callable] = None,
@@ -33,7 +35,7 @@ class ImageClassificationDataset(Dataset):
         
         Args:
             data_dir: Diretório base dos dados (ex: ./compressed)
-            quality: Qualidade da imagem (1, 5, ou 10) - usado apenas para compatibilidade
+            quality: Qualidade da imagem (1, 5, 10, etc) ou 'original'
             split: Split a carregar (train, val, test)
             classes: Lista de classes. Se None, detecta automaticamente
             transform: Transformações a aplicar nas imagens
@@ -48,8 +50,11 @@ class ImageClassificationDataset(Dataset):
         if custom_split_path:
             quality_dir = Path(custom_split_path)
         else:
-            # Constrói caminho: {data_dir}/q{quality}/{split}/
-            quality_dir = self.data_dir / f"q{quality}" / split
+            quality_dir = resolve_quality_split_dir(
+                data_dir=self.data_dir,
+                quality=quality,
+                split=split
+            )
         
         if not quality_dir.exists():
             raise ValueError(

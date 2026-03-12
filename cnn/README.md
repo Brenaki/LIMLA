@@ -60,6 +60,9 @@ python main.py --model MobileNetV2 --data_dir ./compressed --quality 1 --epochs 
 # Train VGG16 with quality 5 and custom early stopping
 python main.py --model VGG16 --data_dir ./compressed --quality 5 --epochs 100 --patience 10 --min_delta 0.001
 
+# Train with the original dataset (expects ./compressed/original/{train,val,test})
+python main.py --model MobileNetV2 --data_dir ./compressed --quality original --epochs 50
+
 # With custom parameters
 python main.py \
     --model MobileNetV2 \
@@ -92,7 +95,7 @@ python scripts/test_image.py \
 
 - `--model`: Model to train (MobileNetV2 or VGG16)
 - `--data_dir`: Base directory of compressed data
-- `--quality`: Image quality (1, 5, or 10)
+- `--quality`: Image quality (1-100) or `original`
 - `--epochs`: Maximum number of epochs (default: 50)
 - `--batch_size`: Batch size (default: 32)
 - `--learning_rate`: Learning rate (default: 0.001)

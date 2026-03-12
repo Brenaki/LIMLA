@@ -12,6 +12,12 @@ from statsmodels.stats.multicomp import pairwise_tukeyhsd
 from statsmodels.stats.lib import qsturng
 import json
 from typing import Dict, List, Optional
+import sys
+
+# Adiciona diretório raiz ao path para importar módulos
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.data.quality_paths import train_quality_sort_key
 
 
 def load_results_csv(csv_path: str) -> pd.DataFrame:
@@ -396,7 +402,7 @@ def main():
     
     # Para cada modelo e train_quality
     models = filtered['model'].unique()
-    train_qualities = filtered['train_quality'].unique()
+    train_qualities = sorted(filtered['train_quality'].unique(), key=train_quality_sort_key)
     
     all_anova_results = []
     all_tukey_results = []

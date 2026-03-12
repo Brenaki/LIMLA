@@ -10,6 +10,8 @@ import torch
 import torch.nn as nn
 from typing import Optional, Dict, List
 
+from src.data.quality_paths import QualityValue, normalize_quality_value, quality_tag
+
 
 def save_checkpoint(
     model: nn.Module,
@@ -129,7 +131,7 @@ def save_classes_mapping(classes: list, output_dir: str, model_name: str) -> Non
 
 def save_results_to_csv(
     model_name: str,
-    train_quality: int,
+    train_quality: QualityValue,
     test_quality: str,
     seed: Optional[int],
     history: Dict[str, List[float]],
@@ -147,7 +149,7 @@ def save_results_to_csv(
     
     Args:
         model_name: Nome do modelo
-        train_quality: Qualidade usada no treino (1-100)
+        train_quality: Qualidade usada no treino (1-100 ou 'original')
         test_quality: Qualidade usada no teste (1-100 ou 'original')
         seed: Seed usado no treinamento (None se não fornecido)
         history: Dicionário com histórico de treinamento
@@ -171,7 +173,8 @@ def save_results_to_csv(
     
     # Gera run_id
     seed_str = f"seed{seed}" if seed is not None else "noseed"
-    run_id = f"{model_name}_q{train_quality}_{seed_str}"
+    train_quality = normalize_quality_value(train_quality)
+    run_id = f"{model_name}_{quality_tag(train_quality)}_{seed_str}"
     
     # Timestamp
     timestamp = datetime.now().isoformat()
@@ -261,7 +264,7 @@ def save_results_to_csv(
 
 def save_test_results_to_csv(
     model_name: str,
-    train_quality: int,
+    train_quality: QualityValue,
     test_quality: str,
     seed: Optional[int],
     test_metrics: Dict[str, float],
@@ -277,7 +280,7 @@ def save_test_results_to_csv(
     
     Args:
         model_name: Nome do modelo
-        train_quality: Qualidade usada no treino
+        train_quality: Qualidade usada no treino (1-100 ou 'original')
         test_quality: Qualidade usada no teste ('original' ou número)
         seed: Seed usado no treinamento
         test_metrics: Dicionário com métricas do test (ex: {'loss': 0.5, 'accuracy': 85.3})
@@ -290,7 +293,8 @@ def save_test_results_to_csv(
     """
     # Gera run_id
     seed_str = f"seed{seed}" if seed is not None else "noseed"
-    run_id = f"{model_name}_q{train_quality}_{seed_str}"
+    train_quality = normalize_quality_value(train_quality)
+    run_id = f"{model_name}_{quality_tag(train_quality)}_{seed_str}"
     
     # Timestamp
     timestamp = datetime.now().isoformat()

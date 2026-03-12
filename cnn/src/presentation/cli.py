@@ -5,6 +5,7 @@ Interface de linha de comando (CLI) usando argparse.
 import argparse
 from pathlib import Path
 from ..domain.models import SUPPORTED_MODELS
+from ..data.quality_paths import resolve_quality_split_dir, validate_quality_value
 
 
 def parse_args():
@@ -43,9 +44,9 @@ Exemplos de uso:
     
     parser.add_argument(
         '--quality',
-        type=int,
-        default=1,
-        help='Qualidade da imagem (1-100) - padrão: 1'
+        type=str,
+        default='1',
+        help="Qualidade da imagem (1-100) ou 'original' - padrão: 1"
     )
     
     # Treinamento
@@ -138,30 +139,22 @@ Exemplos de uso:
     )
     
     args = parser.parse_args()
-    
+
     # Validações
-    if args.quality < 1 or args.quality > 100:
-        parser.error(f"Qualidade deve estar entre 1 e 100, recebido: {args.quality}")
+    try:
+        args.quality = validate_quality_value(args.quality)
+    except ValueError as exc:
+        parser.error(str(exc))
     
     data_dir = Path(args.data_dir)
     if not data_dir.exists():
         parser.error(f"Diretório de dados não encontrado: {args.data_dir}")
     
     # Valida estrutura de pastas
-    quality_dir = data_dir / f"q{args.quality}"
-    if not quality_dir.exists():
-        parser.error(
-            f"Diretório de qualidade não encontrado: {quality_dir}. "
-            f"Verifique se --data_dir e --quality estão corretos."
-        )
-    
-    train_dir = quality_dir / "train"
-    val_dir = quality_dir / "val"
-    
-    if not train_dir.exists():
-        parser.error(f"Diretório de treinamento não encontrado: {train_dir}")
-    
-    if not val_dir.exists():
-        parser.error(f"Diretório de validação não encontrado: {val_dir}")
+    try:
+        train_dir = resolve_quality_split_dir(data_dir, args.quality, 'train')
+        val_dir = resolve_quality_split_dir(data_dir, args.quality, 'val')
+    except ValueError as exc:
+        parser.error(str(exc))
     
     return args

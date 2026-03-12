@@ -13,6 +13,7 @@ from pathlib import Path
 from src.presentation.cli import parse_args
 from src.presentation.progress import print_config, print_training_summary
 from src.data.dataloader import create_dataloaders, create_test_loader
+from src.data.quality_paths import find_original_dir, quality_tag
 from src.infrastructure.model_builder import build_model
 from src.infrastructure.checkpoint import (
     save_checkpoint, save_classes_mapping, save_results_to_csv,
@@ -111,7 +112,7 @@ def main():
     # Configura early stopping
     output_dir = Path(args.output_dir)
     # Inclui qualidade e seed no nome do diretório do modelo
-    model_dir_name = f"{args.model}_q{args.quality}"
+    model_dir_name = f"{args.model}_{quality_tag(args.quality)}"
     if args.seed is not None:
         model_dir_name = f"{model_dir_name}_seed{args.seed}"
     model_output_dir = output_dir / model_dir_name
@@ -292,13 +293,7 @@ def main():
         test_qualities.append(str(q))
     
     # Detecta pasta original (qualquer pasta que não seja q* e tenha test/)
-    original_dir = None
-    for item in data_dir_path.iterdir():
-        if item.is_dir() and not item.name.startswith('q'):
-            test_dir = item / 'test'
-            if test_dir.exists():
-                original_dir = item
-                break
+    original_dir = find_original_dir(data_dir_path, split='test')
     
     # Se encontrou pasta original, adiciona 'original' à lista
     if original_dir:
